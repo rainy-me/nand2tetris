@@ -39,6 +39,7 @@ function refreshSet(k: string, v: string) {
       : v.endsWith("pending")
       ? cyan
       : bgRed;
+    v = ` ${v} `;
     console.log(`${k.padEnd(10)}: ${color(v)}`);
   });
 }
