@@ -51,7 +51,7 @@ M=0
     @SCREEN
     D=A
 
-    @8191
+    @8192
     D=D+A
 
     @addr
