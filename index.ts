@@ -16,7 +16,10 @@ if (!no) {
 const project = `./projects/${no}`;
 console.log(`working on: ${project}`);
 
-const results: Record<string, string> = {};
+type Status = "running" | "ok" | "error";
+type Result = { status: Status; info: string };
+
+const results: Record<string, Result> = {};
 
 for await (const entry of walk(project)) {
   tryRunTest(entry.path);
@@ -30,37 +33,81 @@ for await (const event of watcher) {
   tryRunTest(path);
 }
 
-function refreshSet(k: string, v: string) {
+function refreshSet(k: string, v: Result) {
+  v.info = v.info.trim();
   results[k] = v;
   console.clear();
   Object.entries(results).forEach(([k, v]) => {
-    const color = v.endsWith("successfully")
-      ? (t: string) => bgGreen(black(t))
-      : v.endsWith("pending")
-      ? cyan
-      : bgRed;
-    v = ` ${v} `;
-    console.log(`${k.padEnd(10)}: ${color(v)}`);
+    const color =
+      v.status === "ok"
+        ? (t: string) => bgGreen(black(t))
+        : v.status === "running"
+        ? cyan
+        : bgRed;
+    const name = k.padEnd(10);
+    const info = color(` ${v.info} `);
+    console.log([name, info].join(" : "));
   });
 }
 
 async function tryRunTest(path: string) {
   const { name, ext } = extractFileInfo(path);
-  if (ext !== "hdl") {
-    return;
+
+  if (ext === "asm") {
+    const ok = await runCmd(name, [
+      "sh",
+      "tools/Assembler.sh",
+      `projects/${no}/${name}.asm`,
+    ]);
+    if (!ok) return;
+
+    await runCmd(name, [
+      "sh",
+      "tools/CPUEmulator.sh",
+      `projects/${no}/${name}.tst`,
+    ]);
   }
-  refreshSet(name, "pending");
-  const cmd = Deno.run({
-    cmd: ["sh", "tools/HardwareSimulator.sh", `projects/${no}/${name}.tst`],
+
+  if (ext === "hdl") {
+    await runCmd(name, [
+      "sh",
+      "tools/HardwareSimulator.sh",
+      `projects/${no}/${name}.tst`,
+    ]);
+  }
+}
+
+async function runCmd(name: string, cmd: Deno.RunOptions["cmd"]) {
+  refreshSet(name, {
+    status: "running",
+    info: `running ${cmd.join(" ")}...`,
+  });
+
+  const decoder = new TextDecoder();
+  const task = Deno.run({
+    cmd,
     stdout: "piped",
     stderr: "piped",
   });
-  const output = await cmd.output();
-  const errOutput = await cmd.stderrOutput();
-  cmd.close();
-  const text = new TextDecoder().decode(output);
-  const errText = new TextDecoder().decode(errOutput);
-  refreshSet(name, (text || errText).trim());
+
+  const [ok, error] = await Promise.all(
+    [task.output(), task.stderrOutput()].map(async (out) => {
+      return decoder.decode(await out);
+    })
+  );
+  task.close();
+
+  const state: Result = error
+    ? {
+        status: "error",
+        info: error,
+      }
+    : {
+        status: "ok",
+        info: ok,
+      };
+  refreshSet(name, state);
+  return !error;
 }
 
 function extractFileInfo(path: string) {
