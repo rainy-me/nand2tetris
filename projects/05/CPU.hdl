@@ -40,7 +40,9 @@ CHIP CPU {
 
     PARTS:
 
-    Not(in=isNg,out=isPos);
+    Not(in=isNg,out=isNotNg);
+    Not(in=isZero,out=isNotZero);
+    And(a=isNotNg,b=isNotZero,out=isPos);
     And(a=instruction[0],b=isPos,out=GTMatch);
     And(a=instruction[1],b=isZero,out=ZeroMatch);
     And(a=instruction[2],b=isNg,out=LTMatch);
