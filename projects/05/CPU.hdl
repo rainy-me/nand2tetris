@@ -39,5 +39,75 @@ CHIP CPU {
         pc[15];          // address of next instruction
 
     PARTS:
-    // Put your code here:
+
+    Not(in=isNg,out=isPos);
+    And(a=instruction[0],b=isPos,out=GTMatch);
+    And(a=instruction[1],b=isZero,out=ZeroMatch);
+    And(a=instruction[2],b=isNg,out=LTMatch);
+    Or(a=GTMatch,b=ZeroMatch,out=GTOrZeroMatch);
+    Or(a=GTOrZeroMatch,b=LTMatch,out=SomeMatch);
+
+    And(a=instruction[0],b=instruction[1],out=abMatch);
+    And(a=abMatch,b=instruction[2],out=unconditionalMatch);
+
+    Or(a=SomeMatch,b=unconditionalMatch,out=mayBeShouldJump);
+    And(a=mayBeShouldJump,b=instruction[15],out=shouldJump);
+    Not(in=shouldJump,out=inc);
+
+    PC(
+        in=outARegisterToPC,
+        reset=reset,
+        inc=true,
+        load=shouldJump,
+        out[0..14]=pc
+    );
+    And(a=instruction[4],b=instruction[15],out=shouldLoadDRegister);
+    DRegister(
+        in=toD,
+        load=shouldLoadDRegister,
+        out=outDRegister
+    );
+    ALU(
+        x=outDRegister,
+        y=muxBeforeALU,
+        zx=instruction[11],
+        nx=instruction[10],
+        zy=instruction[9],
+        ny=instruction[8],
+        f=instruction[7],
+        no=instruction[6],
+        zr=isZero,
+        ng=isNg,
+        out=outM,
+        out=toD,
+        out=toA
+    );
+    Mux16(
+        a=instruction,
+        b=toA,
+        sel=instruction[15],
+        out=muxBeforeA
+    );
+    Not(in=instruction[15],out=isAddr);
+    Or(a=instruction[5],b=isAddr,out=shouldLoadARegister);
+    ARegister(
+        in=muxBeforeA,
+        load=shouldLoadARegister,
+        out[0..14]=addressM,
+        out=outARegisterToALU,
+        out=outARegisterToPC
+    );
+    Mux16(
+        a=outARegisterToALU,
+        b=inM,
+        sel=instruction[12],
+        out=muxBeforeALU
+    );
+    And(a=instruction[15],b=instruction[3],out=shouldWriteMRegister);
+    Mux(
+        a=false,
+        b=true,
+        sel=shouldWriteMRegister,
+        out=writeM
+    );
 }
