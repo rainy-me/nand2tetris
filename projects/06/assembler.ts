@@ -132,7 +132,7 @@ function assemble(instruction: string) {
     const aIndicatorCode = comp.includes("M") ? "1" : "0";
     const destCode = destCodeMap[dest];
     const compCode = compCodeMap[comp];
-    console.log({ instruction, jump, comp, dest });
+    // console.log({ instruction, jump, comp, dest });
     return ["111", aIndicatorCode, compCode, destCode, jumpCode].join("");
   }
 }

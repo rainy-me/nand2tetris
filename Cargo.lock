@@ -7,6 +7,9 @@ version = "0.1.0"
 [[package]]
 name = "cli"
 version = "0.1.0"
+dependencies = [
+ "assembler",
+]
 
 [[package]]
 name = "vm-translator"
