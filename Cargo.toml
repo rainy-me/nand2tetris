@@ -1,0 +1,6 @@
+[workspace]
+members = [
+    "implantations/cli",
+    "implantations/assembler",
+    "implantations/vm-translator",
+]
