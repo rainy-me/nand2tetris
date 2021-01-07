@@ -15,10 +15,10 @@ impl Assembler {
         }
     }
 
-    pub fn process(&mut self, input: String) -> String {
+    pub fn process(&mut self, asm_code: String) -> String {
         let mut out = Vec::new();
         let mut line_index = 0;
-        for raw_line in input.split("\n") {
+        for raw_line in asm_code.lines() {
             if let Some(before_comment) = raw_line.replace(" ", "").split("//").next() {
                 let before_comment = before_comment.trim();
                 if before_comment.is_empty() || self.extract_label(before_comment, line_index) {

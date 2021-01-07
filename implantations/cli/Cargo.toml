@@ -8,3 +8,4 @@ edition = "2018"
 
 [dependencies]
 assembler= {path = '../assembler'}
+vm-translator= {path = '../vm-translator'}
