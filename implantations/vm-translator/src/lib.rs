@@ -192,8 +192,34 @@ mod tests {
     use crate::VMTranslator;
 
     #[test]
-    fn translation() {
-        let mut vmt = VMTranslator::new();
-        vmt.process("pop local 0".to_string());
+    fn test_translator() {
+        fn translate_and_run(names: Vec<&str>) {
+            for name in names {
+                let base = concat!(env!("CARGO_MANIFEST_DIR"), "/../../projects/07/");
+                let vm_code = std::fs::read_to_string(format!("{}{}.vm", base, name))
+                    .expect("failed to read test file")
+                    .to_string();
+                let mut vm_translator = VMTranslator::new();
+                let out = vm_translator.process(vm_code);
+                std::fs::write(format!("{}{}.asm", base, name), out).expect("failed to write file");
+                println!("translating {} ... ok", name);
+                let status = std::process::Command::new("sh")
+                    .arg(concat!(
+                        env!("CARGO_MANIFEST_DIR"),
+                        "/../../tools/CPUEmulator.sh"
+                    ))
+                    .arg(format!("{}{}.tst", base, name))
+                    .status()
+                    .expect("failed to execute process");
+                println!("testing result ... {}", status);
+            }
+        }
+        translate_and_run(vec![
+            "StackArithmetic/SimpleAdd/SimpleAdd",
+            "StackArithmetic/StackTest/StackTest",
+            "MemoryAccess/BasicTest/BasicTest",
+            "MemoryAccess/PointerTest/PointerTest",
+            "MemoryAccess/StaticTest/StaticTest",
+        ])
     }
 }

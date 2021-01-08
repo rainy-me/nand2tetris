@@ -14,8 +14,8 @@ fn main() {
             "translate" => match std::env::args().nth(2) {
                 Some(file) => {
                     let content = std::fs::read_to_string(file.clone()).expect("cannot read file");
-                    let mut assembler = vm_translator::VMTranslator::new();
-                    let out = assembler.process(content);
+                    let mut vm_translator = vm_translator::VMTranslator::new();
+                    let out = vm_translator.process(content);
                     std::fs::write(file.replace(".vm", ".asm"), out).expect("failed to write file");
                 }
                 _ => println!("please provide a file"),
