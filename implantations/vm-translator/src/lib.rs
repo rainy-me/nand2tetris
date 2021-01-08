@@ -191,35 +191,44 @@ impl VMTranslator {
 mod tests {
     use crate::VMTranslator;
 
+    fn translate_and_run(name: &str) {
+        let base = concat!(env!("CARGO_MANIFEST_DIR"), "/../../projects/07/");
+        let vm_code = std::fs::read_to_string(format!("{}{}.vm", base, name))
+            .expect("failed to read test file")
+            .to_string();
+        let mut vm_translator = VMTranslator::new();
+        let out = vm_translator.process(vm_code);
+        std::fs::write(format!("{}{}.asm", base, name), out).expect("failed to write file");
+        println!("\ttranslating {} ... ok", name);
+        let status = std::process::Command::new("sh")
+            .arg(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../tools/CPUEmulator.sh"
+            ))
+            .arg(format!("{}{}.tst", base, name))
+            .status()
+            .expect("failed to execute process");
+        println!("\ttesting result ... {}", status);
+    }
+
     #[test]
-    fn test_translator() {
-        fn translate_and_run(names: Vec<&str>) {
-            for name in names {
-                let base = concat!(env!("CARGO_MANIFEST_DIR"), "/../../projects/07/");
-                let vm_code = std::fs::read_to_string(format!("{}{}.vm", base, name))
-                    .expect("failed to read test file")
-                    .to_string();
-                let mut vm_translator = VMTranslator::new();
-                let out = vm_translator.process(vm_code);
-                std::fs::write(format!("{}{}.asm", base, name), out).expect("failed to write file");
-                println!("translating {} ... ok", name);
-                let status = std::process::Command::new("sh")
-                    .arg(concat!(
-                        env!("CARGO_MANIFEST_DIR"),
-                        "/../../tools/CPUEmulator.sh"
-                    ))
-                    .arg(format!("{}{}.tst", base, name))
-                    .status()
-                    .expect("failed to execute process");
-                println!("testing result ... {}", status);
-            }
-        }
-        translate_and_run(vec![
-            "StackArithmetic/SimpleAdd/SimpleAdd",
-            "StackArithmetic/StackTest/StackTest",
-            "MemoryAccess/BasicTest/BasicTest",
-            "MemoryAccess/PointerTest/PointerTest",
-            "MemoryAccess/StaticTest/StaticTest",
-        ])
+    fn test_simple_add() {
+        translate_and_run("StackArithmetic/SimpleAdd/SimpleAdd")
+    }
+    #[test]
+    fn test_stack_test() {
+        translate_and_run("StackArithmetic/StackTest/StackTest")
+    }
+    #[test]
+    fn test_basic_test() {
+        translate_and_run("MemoryAccess/BasicTest/BasicTest")
+    }
+    #[test]
+    fn test_pointer_test() {
+        translate_and_run("MemoryAccess/PointerTest/PointerTest")
+    }
+    #[test]
+    fn test_static_test() {
+        translate_and_run("MemoryAccess/StaticTest/StaticTest")
     }
 }

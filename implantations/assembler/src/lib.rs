@@ -212,34 +212,47 @@ mod tests {
         assert_eq!(to_address("2"), Some("000000000000010".to_string()));
     }
 
+    fn compare(name: &str) {
+        let base = concat!(env!("CARGO_MANIFEST_DIR"), "/../../projects/06/");
+        let asm = std::fs::read_to_string(format!("{}{}.asm", base, name))
+            .expect("failed to read test file")
+            .to_string();
+        let hack = std::fs::read_to_string(format!("{}{}.hack", base, name))
+            .expect("failed to read test file")
+            .to_string();
+        let mut assembler = Assembler::new();
+        let out = assembler.process(asm);
+        // println!("{}", out);
+        // println!("{}", hack);
+        assert_eq!(out, hack);
+        println!("\tcomparing {} ... ok", name);
+    }
     #[test]
-    fn test_assembler() {
-        fn compare(names: Vec<&str>) {
-            for name in names {
-                let base = concat!(env!("CARGO_MANIFEST_DIR"), "/../../projects/06/");
-                let asm = std::fs::read_to_string(format!("{}{}.asm", base, name))
-                    .expect("failed to read test file")
-                    .to_string();
-                let hack = std::fs::read_to_string(format!("{}{}.hack", base, name))
-                    .expect("failed to read test file")
-                    .to_string();
-                let mut assembler = Assembler::new();
-                let out = assembler.process(asm);
-                // println!("{}", out);
-                // println!("{}", hack);
-                assert_eq!(out, hack);
-                println!("comparing {} ... ok", name);
-            }
-        }
-        compare(vec![
-            "add/Add",
-            "max/Max",
-            "max/MaxL",
-            "max/MaxL",
-            "rect/Rect",
-            "rect/RectL",
-            "pong/Pong",
-            "pong/PongL",
-        ])
+    fn test_add() {
+        compare("add/Add")
+    }
+    #[test]
+    fn test_max() {
+        compare("max/Max")
+    }
+    #[test]
+    fn test_max_l() {
+        compare("max/MaxL")
+    }
+    #[test]
+    fn test_rect() {
+        compare("rect/Rect")
+    }
+    #[test]
+    fn test_rect_l() {
+        compare("rect/RectL")
+    }
+    #[test]
+    fn test_pong() {
+        compare("pong/Pong")
+    }
+    #[test]
+    fn test_pong_l() {
+        compare("pong/PongL")
     }
 }
