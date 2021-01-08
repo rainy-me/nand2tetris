@@ -1,7 +1,6 @@
-use std::unimplemented;
-
 pub struct VMTranslator {
     file_name: String,
+    label_index: u32,
     output: Vec<String>,
 }
 
@@ -9,6 +8,7 @@ impl VMTranslator {
     pub fn new() -> Self {
         VMTranslator {
             file_name: "".to_string(),
+            label_index: 1,
             output: vec![],
         }
     }
@@ -52,14 +52,18 @@ impl VMTranslator {
                     }
                     "pop" => {
                         self.decr_sp();
-                        self.output.push(
-                            "@SP\n\
-                             A=M\n\
-                             D=M"
-                            .to_string(),
-                        );
                         self.select_target_addr(segment, location);
-                        self.output.push("M=D".to_string());
+                        self.output.push(
+                            "D=A\n\
+                             @SP\n\
+                             A=M\n\
+                             D=D+M\n\
+                             @SP\n\
+                             A=M\n\
+                             A=D-M\n\
+                             M=D-A"
+                                .to_string(),
+                        );
                     }
                     _ => {}
                 }
@@ -71,19 +75,60 @@ impl VMTranslator {
                     "add" => self.output.push("M=M+D".to_string()),
                     "sub" => self.output.push("M=M-D".to_string()),
                     "neg" => self.output.push("M=-D".to_string()),
-                    "eq" => unimplemented!(),
-                    "get" => unimplemented!(),
-                    "lt" => unimplemented!(),
-                    "and" => unimplemented!(),
-                    "or" => unimplemented!(),
-                    "not" => unimplemented!(),
+                    "eq" => {
+                        self.output.push("D=M-D".to_string());
+                        self.emit_logical_commands("JEQ");
+                    }
+                    "get" => {
+                        self.output.push("D=M-D".to_string());
+                        self.emit_logical_commands("JGT");
+                    }
+                    "lt" => {
+                        self.output.push("D=M-D".to_string());
+                        self.emit_logical_commands("JLT");
+                    }
+                    "and" => {
+                        self.output.push("D=M&D".to_string());
+                        self.emit_logical_commands("JNE");
+                    }
+                    "or" => {
+                        self.output.push("D=M|D".to_string());
+                        self.emit_logical_commands("JNE");
+                    }
+                    "not" => {
+                        self.output.push("D=M".to_string());
+                        self.emit_logical_commands("JEQ");
+                    }
                     _ => println!("{}", op),
                 }
             }
             _ => {}
         };
     }
-    /// make D = y; M = x; SP--
+
+    fn emit_logical_commands(&mut self, condition: &str) {
+        self.output.push(format!(
+            "@IF_{0}\n\
+             D;{1}\n\
+             @ELSE_{0}\n\
+             0;JMP\n\
+             (IF_{0})\n\
+                 @SP\n\
+                 A=M-1\n\
+                 M=-1\n\
+                 @END_{0}\n\
+                 0;JMP\n\
+             (ELSE_{0})\n\
+                 @SP\n\
+                 A=M-1\n\
+                 M=0\n\
+             (END_{0})",
+            self.label_index, condition
+        ));
+        self.label_index += 1;
+    }
+
+    /// make M = x; D = y; SP--
     fn select_top_of_stack(&mut self) {
         self.output.push(
             "@SP\n\
