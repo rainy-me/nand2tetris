@@ -25,122 +25,74 @@ impl VMTranslator {
         self.output.join("\n") + "\n"
     }
 
+    fn emit(&mut self, code: &str) {
+        self.output.push(code.to_string())
+    }
+
     fn translate_line(&mut self, line: &str) {
         let parts: Vec<&str> = line.split(' ').collect();
         match (parts.get(0), parts.get(1), parts.get(2)) {
             (Some(&command), Some(&segment), Some(location)) if location.parse::<u32>().is_ok() => {
-                println!("pp: {}+{}+{}", command, segment, location);
+                // println!("pp: {}+{}+{}", command, segment, location);
                 match command {
                     "push" => {
                         if segment == "constant" {
-                            self.output.push(format!(
+                            self.emit(&format!(
                                 "@{}\n\
                                  D=A",
                                 location
                             ));
                         } else {
                             self.select_target_addr(segment, location);
-                            self.output.push("D=M".to_string());
+                            self.emit("D=M");
                         };
-                        self.output.push(
+                        self.emit(
                             "@SP\n\
-                             A=M\n\
-                             M=D"
-                            .to_string(),
+                                  A=M\n\
+                                  M=D",
                         );
                         self.incr_sp();
                     }
                     "pop" => {
                         self.decr_sp();
                         self.select_target_addr(segment, location);
-                        self.output.push(
+                        self.emit(
                             "D=A\n\
-                             @SP\n\
-                             A=M\n\
-                             D=D+M\n\
-                             @SP\n\
-                             A=M\n\
-                             A=D-M\n\
-                             M=D-A"
-                                .to_string(),
+                                  @SP\n\
+                                  A=M\n\
+                                  D=D+M\n\
+                                  @SP\n\
+                                  A=M\n\
+                                  A=D-M\n\
+                                  M=D-A",
                         );
                     }
                     _ => {}
                 }
             }
-            (Some(&op), None, None) => {
-                println!("op: {}", op);
-                if op == "neg" || op == "not" {
-                    self.output.push("@SP\nA=M-1".to_string());
-                }else{
-                    self.select_top_of_stack();
+            (Some(&op), None, None) => match op {
+                "add" => self.operate_top_two("M=M+D"),
+                "sub" => self.operate_top_two("M=M-D"),
+                "neg" => self.operate_top("M=-M"),
+                "eq" => {
+                    self.operate_top_two("D=M-D");
+                    self.emit_logical_commands("JEQ");
                 }
-
-                match op {
-                    "add" => self.output.push("M=M+D".to_string()),
-                    "sub" => self.output.push("M=M-D".to_string()),
-                    "neg" => self.output.push("M=-M".to_string()),
-                    "eq" => {
-                        self.output.push("D=M-D".to_string());
-                        self.emit_logical_commands("JEQ");
-                    }
-                    "gt" => {
-                        self.output.push("D=M-D".to_string());
-                        self.emit_logical_commands("JGT");
-                    }
-                    "lt" => {
-                        self.output.push("D=M-D".to_string());
-                        self.emit_logical_commands("JLT");
-                    }
-                    "and" => {
-                        self.output.push("M=M&D".to_string());
-                    }
-                    "or" => {
-                        self.output.push("M=M|D".to_string());
-                    }
-                    "not" => {
-                        self.output.push("M=!M".to_string());
-                    }
-                    _ => println!("{}", op),
+                "gt" => {
+                    self.operate_top_two("D=M-D");
+                    self.emit_logical_commands("JGT");
                 }
-            }
+                "lt" => {
+                    self.operate_top_two("D=M-D");
+                    self.emit_logical_commands("JLT");
+                }
+                "and" => self.operate_top_two("M=M&D"),
+                "or" => self.operate_top_two("M=M|D"),
+                "not" => self.operate_top("M=!M"),
+                _ => println!("{}", op),
+            },
             _ => {}
         };
-    }
-
-    fn emit_logical_commands(&mut self, condition: &str) {
-        self.output.push(format!(
-            "@IF_{0}\n\
-             D;{1}\n\
-             @ELSE_{0}\n\
-             0;JMP\n\
-             (IF_{0})\n\
-                 @SP\n\
-                 A=M-1\n\
-                 M=-1\n\
-                 @END_{0}\n\
-                 0;JMP\n\
-             (ELSE_{0})\n\
-                 @SP\n\
-                 A=M-1\n\
-                 M=0\n\
-             (END_{0})",
-            self.label_index, condition
-        ));
-        self.label_index += 1;
-    }
-
-    /// make M = x; D = y; SP--
-    fn select_top_of_stack(&mut self) {
-        self.output.push(
-            "@SP\n\
-             M=M-1\n\
-             A=M\n\
-             D=M\n\
-             @SP\n\
-             A=M-1"
-                .to_string(),
-        )
     }
 
     fn select_target_addr<'a>(&mut self, segment: &str, location: &'a str) {
@@ -178,21 +130,59 @@ impl VMTranslator {
                 )
             }
         };
-        self.output.push(update_cmd)
+        self.emit(&update_cmd)
+    }
+
+    fn emit_logical_commands(&mut self, condition: &str) {
+        self.emit(&format!(
+            "@IF_{0}\n\
+             D;{1}\n\
+             @ELSE_{0}\n\
+             0;JMP\n\
+             (IF_{0})\n\
+                 @SP\n\
+                 A=M-1\n\
+                 M=-1\n\
+                 @END_{0}\n\
+                 0;JMP\n\
+             (ELSE_{0})\n\
+                 @SP\n\
+                 A=M-1\n\
+                 M=0\n\
+             (END_{0})",
+            self.label_index, condition
+        ));
+        self.label_index += 1;
+    }
+
+    /// make M = x; D = y; SP--
+    fn operate_top_two(&mut self, op_code: &str) {
+        self.emit(
+            "@SP\n\
+                  M=M-1\n\
+                  A=M\n\
+                  D=M\n\
+                  @SP\n\
+                  A=M-1",
+        );
+        self.emit(op_code)
+    }
+
+    fn operate_top(&mut self, op_code: &str) {
+        self.emit("@SP\nA=M-1");
+        self.emit(op_code)
     }
 
     fn incr_sp(&mut self) {
-        self.output.push(
+        self.emit(
             "@SP\n\
-             M=M+1"
-                .to_string(),
+                  M=M+1",
         )
     }
     fn decr_sp(&mut self) {
-        self.output.push(
+        self.emit(
             "@SP\n\
-             M=M-1"
-                .to_string(),
+                  M=M-1",
         )
     }
 }
