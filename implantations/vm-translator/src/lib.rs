@@ -70,16 +70,21 @@ impl VMTranslator {
             }
             (Some(&op), None, None) => {
                 println!("op: {}", op);
-                self.select_top_of_stack();
+                if op == "neg" || op == "not" {
+                    self.output.push("@SP\nA=M-1".to_string());
+                }else{
+                    self.select_top_of_stack();
+                }
+
                 match op {
                     "add" => self.output.push("M=M+D".to_string()),
                     "sub" => self.output.push("M=M-D".to_string()),
-                    "neg" => self.output.push("M=-D".to_string()),
+                    "neg" => self.output.push("M=-M".to_string()),
                     "eq" => {
                         self.output.push("D=M-D".to_string());
                         self.emit_logical_commands("JEQ");
                     }
-                    "get" => {
+                    "gt" => {
                         self.output.push("D=M-D".to_string());
                         self.emit_logical_commands("JGT");
                     }
@@ -88,16 +93,13 @@ impl VMTranslator {
                         self.emit_logical_commands("JLT");
                     }
                     "and" => {
-                        self.output.push("D=M&D".to_string());
-                        self.emit_logical_commands("JNE");
+                        self.output.push("M=M&D".to_string());
                     }
                     "or" => {
-                        self.output.push("D=M|D".to_string());
-                        self.emit_logical_commands("JNE");
+                        self.output.push("M=M|D".to_string());
                     }
                     "not" => {
-                        self.output.push("D=M".to_string());
-                        self.emit_logical_commands("JEQ");
+                        self.output.push("M=!M".to_string());
                     }
                     _ => println!("{}", op),
                 }
@@ -171,7 +173,7 @@ impl VMTranslator {
                     "@{}\n\
                      D=A\n\
                      @{}\n\
-                     A=D+A",
+                     A=D+M",
                     location, label
                 )
             }
