@@ -43,7 +43,10 @@ impl VMTranslator {
                 }
             }
         }
-        deferred.iter().for_each(|e| self.process_single(e.path()));
+        deferred.iter().for_each(|e| {
+            self.filename = e.path().file_stem().unwrap().to_os_string();
+            self.process_single(e.path())
+        });
         self
     }
 
