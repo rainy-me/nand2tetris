@@ -436,4 +436,9 @@ mod tests {
     fn test_fibonacci_element() {
         translate_and_run("08/FunctionCalls/FibonacciElement")
     }
+
+    #[test]
+    fn test_statics_test() {
+        translate_and_run("08/FunctionCalls/StaticsTest")
+    }
 }
