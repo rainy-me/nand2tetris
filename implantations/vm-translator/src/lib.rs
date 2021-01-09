@@ -1,8 +1,8 @@
-use std::path::PathBuf;
 use std::{
     ffi::{OsStr, OsString},
     unimplemented,
 };
+use std::{fs::DirEntry, path::PathBuf};
 pub struct VMTranslator {
     path: PathBuf,
     target: PathBuf,
@@ -27,31 +27,40 @@ impl VMTranslator {
         }
     }
 
+    pub fn write(&self) {
+        let mut asm_path = self.target.clone();
+        asm_path.set_extension("asm");
+        std::fs::write(asm_path, self.output.join("\n") + "\n").expect("failed to write file");
+    }
+
     pub fn process(&mut self) -> &mut Self {
+        let mut deferred = Vec::new();
         for entry in self.path.read_dir().expect("") {
             if let Ok(entry) = entry {
-                if entry.path().extension() != Some(OsStr::new("vm")) {
-                    continue;
-                }
-                let vm_code = std::fs::read_to_string(entry.path()).expect("cannot read file");
-                for raw_line in vm_code.lines() {
-                    if let Some(before_comment) = raw_line.split("//").next() {
-                        let line = before_comment.trim();
-                        if line.is_empty() {
-                            continue;
-                        }
-                        self.translate_line(line)
-                    }
+                match entry.file_name().to_str().unwrap() {
+                    "Sys.vm" => self.process_single(entry.path()),
+                    _ => deferred.push(entry),
                 }
             }
         }
+        deferred.iter().for_each(|e| self.process_single(e.path()));
         self
     }
 
-    pub fn write(&self) {
-        let mut asm_path = self.target.clone();
-        asm_path.set_extension(OsStr::new("asm"));
-        std::fs::write(asm_path, self.output.join("\n") + "\n").expect("failed to write file");
+    fn process_single(&mut self, path: PathBuf) {
+        if path.extension() != Some(OsStr::new("vm")) {
+            return;
+        }
+        let vm_code = std::fs::read_to_string(path).expect("cannot read file");
+        for raw_line in vm_code.lines() {
+            if let Some(before_comment) = raw_line.split("//").next() {
+                let line = before_comment.trim();
+                if line.is_empty() {
+                    continue;
+                }
+                self.translate_line(line)
+            }
+        }
     }
 
     fn emit(&mut self, code: &str) {
@@ -116,7 +125,7 @@ impl VMTranslator {
                      @SP\n\
                      A=M\n\
                      M=D",
-                     return_label
+                    return_label
                 ));
                 self.incr_sp();
                 self.push_location("@LCL");
@@ -145,15 +154,16 @@ impl VMTranslator {
             ("function", Some(&function_name), Some(n_args)) => {
                 self.emit(&format!("({})", function_name,));
                 let n = n_args.parse::<u16>().unwrap();
-                (0..n).for_each(|_| {self.emit(
-                    "@0
+                (0..n).for_each(|_| {
+                    self.emit(
+                        "@0
                      D=A\n\
                      @SP\n\
                      A=M\n\
                      M=D",
-                );
-                self.incr_sp();
-            });
+                    );
+                    self.incr_sp();
+                });
             }
             (move_cmd, Some(&target), None) => match move_cmd {
                 "label" => self.emit(&format!("({})", target)),
@@ -421,5 +431,9 @@ mod tests {
     #[test]
     fn test_nested_call() {
         translate_and_run("08/FunctionCalls/NestedCall")
+    }
+    #[test]
+    fn test_fibonacci_element() {
+        translate_and_run("08/FunctionCalls/FibonacciElement")
     }
 }
