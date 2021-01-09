@@ -13,7 +13,9 @@ fn main() {
             },
             "translate" => match std::env::args().nth(2) {
                 Some(file) => {
-                    vm_translator::VMTranslator::load(&file).process().write();
+                    vm_translator::VMTranslator::load(std::path::PathBuf::from(&file))
+                        .process()
+                        .write();
                 }
                 _ => println!("please provide a file"),
             },

@@ -5,17 +5,22 @@ use std::{
 };
 pub struct VMTranslator {
     path: PathBuf,
+    target: PathBuf,
     filename: OsString,
     label_index: u32,
     output: Vec<String>,
 }
 
 impl VMTranslator {
-    pub fn load(path: &str) -> Self {
-        let path = PathBuf::from(path);
-        let filename = path.file_stem().unwrap().to_os_string();
+    pub fn load(path: PathBuf) -> Self {
+        let filename = path.file_name().unwrap().to_os_string();
+        let mut target = path.clone();
+        let name = path.file_name().unwrap();
+        target.push(name);
+
         VMTranslator {
             path,
+            target,
             filename,
             label_index: 1,
             output: vec![],
@@ -23,23 +28,30 @@ impl VMTranslator {
     }
 
     pub fn process(&mut self) -> &mut Self {
-        let vm_code = std::fs::read_to_string(&self.path).expect("cannot read file");
-        for raw_line in vm_code.lines() {
-            if let Some(before_comment) = raw_line.split("//").next() {
-                let line = before_comment.trim();
-                if line.is_empty() {
+        for entry in self.path.read_dir().expect("") {
+            if let Ok(entry) = entry {
+                if entry.path().extension() != Some(OsStr::new("vm")) {
                     continue;
                 }
-                self.translate_line(line)
+                let vm_code = std::fs::read_to_string(entry.path()).expect("cannot read file");
+                for raw_line in vm_code.lines() {
+                    if let Some(before_comment) = raw_line.split("//").next() {
+                        let line = before_comment.trim();
+                        if line.is_empty() {
+                            continue;
+                        }
+                        self.translate_line(line)
+                    }
+                }
             }
         }
         self
     }
 
     pub fn write(&self) {
-        let mut target_file = self.path.clone();
-        target_file.set_extension(OsStr::new("asm"));
-        std::fs::write(target_file, self.output.join("\n") + "\n").expect("failed to write file");
+        let mut asm_path = self.target.clone();
+        asm_path.set_extension(OsStr::new("asm"));
+        std::fs::write(asm_path, self.output.join("\n") + "\n").expect("failed to write file");
     }
 
     fn emit(&mut self, code: &str) {
@@ -330,10 +342,13 @@ mod tests {
     fn translate_and_run(name: &str) {
         let mut vm_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../projects/");
         vm_path.push(OsStr::new(name));
-        vm_path.set_extension("vm");
+
+        let filename = vm_path.file_name().unwrap().to_os_string();
         let mut tst_path = vm_path.clone();
+        tst_path.push(&filename);
         tst_path.set_extension("tst");
-        VMTranslator::load(&vm_path.to_string_lossy())
+
+        VMTranslator::load(vm_path.canonicalize().unwrap())
             .process()
             .write();
         let output = std::process::Command::new("sh")
@@ -352,37 +367,42 @@ mod tests {
 
     #[test]
     fn test_simple_add() {
-        translate_and_run("07/StackArithmetic/SimpleAdd/SimpleAdd")
+        translate_and_run("07/StackArithmetic/SimpleAdd")
     }
     #[test]
     fn test_stack_test() {
-        translate_and_run("07/StackArithmetic/StackTest/StackTest")
+        translate_and_run("07/StackArithmetic/StackTest")
     }
     #[test]
     fn test_basic_test() {
-        translate_and_run("07/MemoryAccess/BasicTest/BasicTest")
+        translate_and_run("07/MemoryAccess/BasicTest")
     }
     #[test]
     fn test_pointer_test() {
-        translate_and_run("07/MemoryAccess/PointerTest/PointerTest")
+        translate_and_run("07/MemoryAccess/PointerTest")
     }
     #[test]
     fn test_static_test() {
-        translate_and_run("07/MemoryAccess/StaticTest/StaticTest")
+        translate_and_run("07/MemoryAccess/StaticTest")
     }
 
     #[test]
     fn test_basic_loop() {
-        translate_and_run("08/ProgramFlow/BasicLoop/BasicLoop")
+        translate_and_run("08/ProgramFlow/BasicLoop")
     }
 
     #[test]
     fn test_fibonacci_series() {
-        translate_and_run("08/ProgramFlow/FibonacciSeries/FibonacciSeries")
+        translate_and_run("08/ProgramFlow/FibonacciSeries")
     }
 
     #[test]
     fn test_simple_function() {
-        translate_and_run("08/FunctionCalls/SimpleFunction/SimpleFunction")
+        translate_and_run("08/FunctionCalls/SimpleFunction")
+    }
+
+    #[test]
+    fn test_nested_call() {
+        translate_and_run("08/FunctionCalls/NestedCall")
     }
 }
