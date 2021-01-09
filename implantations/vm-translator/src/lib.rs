@@ -34,20 +34,37 @@ impl VMTranslator {
     }
 
     pub fn process(&mut self) -> &mut Self {
-        let mut deferred = Vec::new();
-        for entry in self.path.read_dir().expect("") {
-            if let Ok(entry) = entry {
-                match entry.file_name().to_str().unwrap() {
-                    "Sys.vm" => self.process_single(entry.path()),
-                    _ => deferred.push(entry),
-                }
-            }
+        let paths = std::fs::read_dir(&self.path)
+            .expect("failed to read dir")
+            .map(|e| e.unwrap().path())
+            .filter(|e| match e.extension() {
+                Some(ext) => ext.to_str() == Some("vm"),
+                _ => false,
+            })
+            .collect::<Vec<PathBuf>>();
+
+        if paths.len() > 1 {
+            self.emit_boot();
         }
-        deferred.iter().for_each(|e| {
-            self.filename = e.path().file_stem().unwrap().to_os_string();
-            self.process_single(e.path())
-        });
+
+        for path in paths {
+            self.filename = path.file_stem().unwrap().to_os_string();
+            self.process_single(path);
+        }
         self
+    }
+
+    fn emit_boot(&mut self) {
+        self.output.append(
+            vec![
+                "@256".to_string(),
+                "D=A".to_string(),
+                "@SP".to_string(),
+                "M=D".to_string(),
+            ]
+            .as_mut(),
+        );
+        self.translate_line("call Sys.init 0");
     }
 
     fn process_single(&mut self, path: PathBuf) {
