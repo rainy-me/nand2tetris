@@ -188,6 +188,8 @@ pub fn to_address(num_like: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use crate::{get_predefined_symbols, to_address, Assembler};
+    use std::ffi::OsStr;
+    use std::path::PathBuf;
 
     #[test]
     fn test_get_predefined_symbols() {
@@ -213,15 +215,27 @@ mod tests {
     }
 
     fn compare(name: &str) {
-        let base = concat!(env!("CARGO_MANIFEST_DIR"), "/../../projects/06/");
-        let asm = std::fs::read_to_string(format!("{}{}.asm", base, name))
+        let mut asm_path =
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(OsStr::new("../../projects/06/"));
+        asm_path.push(OsStr::new(name));
+        asm_path.set_extension("asm");
+        std::process::Command::new("sh")
+            .arg(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../tools/Assembler.sh"
+            ))
+            .arg(asm_path.canonicalize().unwrap())
+            .output()
+            .expect("failed to execute run origin assemble script");
+        let mut hack_path = asm_path.clone();
+        hack_path.set_extension("hack");
+        let hack = std::fs::read_to_string(hack_path)
             .expect("failed to read test file")
             .to_string();
-        let hack = std::fs::read_to_string(format!("{}{}.hack", base, name))
+        let asm_content = std::fs::read_to_string(asm_path)
             .expect("failed to read test file")
             .to_string();
-        let mut assembler = Assembler::new();
-        let out = assembler.process(asm);
+        let out = Assembler::new().process(asm_content);
         // println!("{}", out);
         // println!("{}", hack);
         assert_eq!(out, hack);
