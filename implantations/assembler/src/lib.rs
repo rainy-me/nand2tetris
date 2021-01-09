@@ -239,7 +239,6 @@ mod tests {
         // println!("{}", out);
         // println!("{}", hack);
         assert_eq!(out, hack);
-        println!("\tcomparing {} ... ok", name);
     }
     #[test]
     fn test_add() {

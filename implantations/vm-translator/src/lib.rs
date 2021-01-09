@@ -1,8 +1,5 @@
 use std::path::PathBuf;
-use std::{
-    ffi::{OsStr, OsString},
-    unimplemented,
-};
+use std::{ffi::OsString, unimplemented};
 pub struct VMTranslator {
     path: PathBuf,
     target: PathBuf,
@@ -37,7 +34,7 @@ impl VMTranslator {
         let paths = std::fs::read_dir(&self.path)
             .expect("failed to read dir")
             .map(|e| e.unwrap().path())
-            .filter(|e| match e.extension() {
+            .filter(|p| match p.extension() {
                 Some(ext) => ext.to_str() == Some("vm"),
                 _ => false,
             })
@@ -68,9 +65,6 @@ impl VMTranslator {
     }
 
     fn process_single(&mut self, path: PathBuf) {
-        if path.extension() != Some(OsStr::new("vm")) {
-            return;
-        }
         let vm_code = std::fs::read_to_string(path).expect("cannot read file");
         for raw_line in vm_code.lines() {
             if let Some(before_comment) = raw_line.split("//").next() {
