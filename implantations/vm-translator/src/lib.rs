@@ -1,5 +1,8 @@
-use std::ffi::{OsStr, OsString};
 use std::path::PathBuf;
+use std::{
+    ffi::{OsStr, OsString},
+    unimplemented,
+};
 pub struct VMTranslator {
     path: PathBuf,
     filename: OsString,
@@ -46,45 +49,46 @@ impl VMTranslator {
     fn translate_line(&mut self, line: &str) {
         let parts: Vec<&str> = line.split(' ').collect();
         // println!("parts: {:?}", parts);
-        match (parts.get(0), parts.get(1), parts.get(2)) {
-            (Some(&command), Some(&segment), Some(location)) if location.parse::<u32>().is_ok() => {
-                match command {
-                    "push" => {
-                        if segment == "constant" {
-                            self.emit(&format!(
-                                "@{}\n\
-                                 D=A",
-                                location
-                            ));
-                        } else {
-                            self.select_target_addr(segment, location);
-                            self.emit("D=M");
-                        };
-                        self.emit(
-                            "@SP\n\
-                                  A=M\n\
-                                  M=D",
-                        );
-                        self.incr_sp();
-                    }
-                    "pop" => {
-                        self.decr_sp();
-                        self.select_target_addr(segment, location);
-                        self.emit(
-                            "D=A\n\
-                                  @SP\n\
-                                  A=M\n\
-                                  D=D+M\n\
-                                  @SP\n\
-                                  A=M\n\
-                                  A=D-M\n\
-                                  M=D-A",
-                        );
-                    }
-                    _ => {}
-                }
+        match (*parts.get(0).unwrap(), parts.get(1), parts.get(2)) {
+            ("push", Some(&segment), Some(location)) if location.parse::<u16>().is_ok() => {
+                if segment == "constant" {
+                    self.emit(&format!(
+                        "@{}\n\
+                         D=A",
+                        location
+                    ));
+                } else {
+                    self.select_target_addr(segment, location);
+                    self.emit("D=M");
+                };
+                self.emit(
+                    "@SP\n\
+                          A=M\n\
+                          M=D",
+                );
+                self.incr_sp();
             }
-            (Some(&move_cmd), Some(&target), None) => match move_cmd {
+            ("pop", Some(&segment), Some(location)) if location.parse::<u16>().is_ok() => {
+                self.decr_sp();
+                self.select_target_addr(segment, location);
+                self.emit(
+                    "D=A\n\
+                          @SP\n\
+                          A=M\n\
+                          D=D+M\n\
+                          @SP\n\
+                          A=M\n\
+                          A=D-M\n\
+                          M=D-A",
+                );
+            }
+            ("call", Some(&function_name), Some(n_args)) if n_args.parse::<u16>().is_ok() => {
+                unimplemented!()
+            }
+            ("function", Some(&function_name), Some(n_args)) if n_args.parse::<u16>().is_ok() => {
+                unimplemented!()
+            }
+            (move_cmd, Some(&target), None) => match move_cmd {
                 "label" => self.emit(&format!("({})", target)),
                 "goto" => self.emit(&format!(
                     "@{}\n\
@@ -102,9 +106,9 @@ impl VMTranslator {
                         target
                     ))
                 }
-                _ => {}
+                _ => unimplemented!(),
             },
-            (Some(&op), None, None) => match op {
+            (op, None, None) => match op {
                 "add" => self.operate_top_two("M=M+D"),
                 "sub" => self.operate_top_two("M=M-D"),
                 "neg" => self.operate_top("M=-M"),
@@ -123,9 +127,10 @@ impl VMTranslator {
                 "and" => self.operate_top_two("M=M&D"),
                 "or" => self.operate_top_two("M=M|D"),
                 "not" => self.operate_top("M=!M"),
-                _ => println!("{}", op),
+                "return" => unimplemented!(),
+                _ => unimplemented!(),
             },
-            _ => {}
+            _ => unimplemented!(),
         };
     }
 
