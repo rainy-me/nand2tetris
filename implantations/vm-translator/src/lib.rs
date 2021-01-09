@@ -22,11 +22,12 @@ impl VMTranslator {
     pub fn process(&mut self) -> &mut Self {
         let vm_code = std::fs::read_to_string(&self.path).expect("cannot read file");
         for raw_line in vm_code.lines() {
-            if let Some(before_comment) = raw_line.trim().split("//").next() {
-                if before_comment.is_empty() {
+            if let Some(before_comment) = raw_line.split("//").next() {
+                let line = before_comment.trim();
+                if line.is_empty() {
                     continue;
                 }
-                self.translate_line(before_comment)
+                self.translate_line(line)
             }
         }
         self
@@ -44,9 +45,9 @@ impl VMTranslator {
 
     fn translate_line(&mut self, line: &str) {
         let parts: Vec<&str> = line.split(' ').collect();
+        // println!("parts: {:?}", parts);
         match (parts.get(0), parts.get(1), parts.get(2)) {
             (Some(&command), Some(&segment), Some(location)) if location.parse::<u32>().is_ok() => {
-                // println!("pp: {}+{}+{}", command, segment, location);
                 match command {
                     "push" => {
                         if segment == "constant" {
@@ -83,6 +84,26 @@ impl VMTranslator {
                     _ => {}
                 }
             }
+            (Some(&move_cmd), Some(&target), None) => match move_cmd {
+                "label" => self.emit(&format!("({})", target)),
+                "goto" => self.emit(&format!(
+                    "@{}\n\
+                     0;JMP",
+                    target
+                )),
+                "if-goto" => {
+                    self.decr_sp();
+                    self.emit(&format!(
+                        "@SP\n\
+                         A=M\n\
+                         D=M\n\
+                         @{}\n\
+                         D;JNE",
+                        target
+                    ))
+                }
+                _ => {}
+            },
             (Some(&op), None, None) => match op {
                 "add" => self.operate_top_two("M=M+D"),
                 "sub" => self.operate_top_two("M=M-D"),
@@ -207,7 +228,7 @@ mod tests {
     use std::path::PathBuf;
 
     fn translate_and_run(name: &str) {
-        let mut vm_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../projects/07/");
+        let mut vm_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../projects/");
         vm_path.push(OsStr::new(name));
         vm_path.set_extension("vm");
         let mut tst_path = vm_path.clone();
@@ -215,36 +236,47 @@ mod tests {
         VMTranslator::load(&vm_path.to_string_lossy())
             .process()
             .write();
-        println!("\ttranslating {} ... ok", name);
-        let status = std::process::Command::new("sh")
+        let output = std::process::Command::new("sh")
             .arg(concat!(
                 env!("CARGO_MANIFEST_DIR"),
                 "/../../tools/CPUEmulator.sh"
             ))
             .arg(tst_path)
-            .status()
+            .output()
             .expect("failed to execute process");
-        println!("\ttesting result ... {}", status);
+        if !output.status.success() {
+            panic!(output.stderr)
+        }
     }
 
     #[test]
     fn test_simple_add() {
-        translate_and_run("StackArithmetic/SimpleAdd/SimpleAdd")
+        translate_and_run("07/StackArithmetic/SimpleAdd/SimpleAdd")
     }
     #[test]
     fn test_stack_test() {
-        translate_and_run("StackArithmetic/StackTest/StackTest")
+        translate_and_run("07/StackArithmetic/StackTest/StackTest")
     }
     #[test]
     fn test_basic_test() {
-        translate_and_run("MemoryAccess/BasicTest/BasicTest")
+        translate_and_run("07/MemoryAccess/BasicTest/BasicTest")
     }
     #[test]
     fn test_pointer_test() {
-        translate_and_run("MemoryAccess/PointerTest/PointerTest")
+        translate_and_run("07/MemoryAccess/PointerTest/PointerTest")
     }
     #[test]
     fn test_static_test() {
-        translate_and_run("MemoryAccess/StaticTest/StaticTest")
+        translate_and_run("07/MemoryAccess/StaticTest/StaticTest")
+    }
+
+    #[test]
+    fn test_basic_loop() {
+        translate_and_run("08/ProgramFlow/BasicLoop/BasicLoop")
+    }
+
+    #[test]
+    fn test_fibonacci_series() {
+        translate_and_run("08/ProgramFlow/FibonacciSeries/FibonacciSeries")
     }
 }
