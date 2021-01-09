@@ -1,19 +1,26 @@
+use std::ffi::{OsStr, OsString};
+use std::path::PathBuf;
 pub struct VMTranslator {
-    file_name: String,
+    path: PathBuf,
+    filename: OsString,
     label_index: u32,
     output: Vec<String>,
 }
 
 impl VMTranslator {
-    pub fn new() -> Self {
+    pub fn load(path: &str) -> Self {
+        let path = PathBuf::from(path);
+        let filename = path.file_stem().unwrap().to_os_string();
         VMTranslator {
-            file_name: "".to_string(),
+            path,
+            filename,
             label_index: 1,
             output: vec![],
         }
     }
 
-    pub fn process(&mut self, vm_code: String) -> String {
+    pub fn process(&mut self) -> &mut Self {
+        let vm_code = std::fs::read_to_string(&self.path).expect("cannot read file");
         for raw_line in vm_code.lines() {
             if let Some(before_comment) = raw_line.trim().split("//").next() {
                 if before_comment.is_empty() {
@@ -22,7 +29,13 @@ impl VMTranslator {
                 self.translate_line(before_comment)
             }
         }
-        self.output.join("\n") + "\n"
+        self
+    }
+
+    pub fn write(&self) {
+        let mut target_file = self.path.clone();
+        target_file.set_extension(OsStr::new("asm"));
+        std::fs::write(target_file, self.output.join("\n") + "\n").expect("failed to write file");
     }
 
     fn emit(&mut self, code: &str) {
@@ -97,7 +110,7 @@ impl VMTranslator {
 
     fn select_target_addr<'a>(&mut self, segment: &str, location: &'a str) {
         let update_cmd = match segment {
-            "static" => format!("@{}.{}", self.file_name, location),
+            "static" => format!("@{}.{}", self.filename.to_string_lossy(), location),
             "temp" => format!(
                 "@5\n\
                  D=A\n\
@@ -190,22 +203,25 @@ impl VMTranslator {
 #[cfg(test)]
 mod tests {
     use crate::VMTranslator;
+    use std::ffi::OsStr;
+    use std::path::PathBuf;
 
     fn translate_and_run(name: &str) {
-        let base = concat!(env!("CARGO_MANIFEST_DIR"), "/../../projects/07/");
-        let vm_code = std::fs::read_to_string(format!("{}{}.vm", base, name))
-            .expect("failed to read test file")
-            .to_string();
-        let mut vm_translator = VMTranslator::new();
-        let out = vm_translator.process(vm_code);
-        std::fs::write(format!("{}{}.asm", base, name), out).expect("failed to write file");
+        let mut vm_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../projects/07/");
+        vm_path.push(OsStr::new(name));
+        vm_path.set_extension("vm");
+        let mut tst_path = vm_path.clone();
+        tst_path.set_extension("tst");
+        VMTranslator::load(&vm_path.to_string_lossy())
+            .process()
+            .write();
         println!("\ttranslating {} ... ok", name);
         let status = std::process::Command::new("sh")
             .arg(concat!(
                 env!("CARGO_MANIFEST_DIR"),
                 "/../../tools/CPUEmulator.sh"
             ))
-            .arg(format!("{}{}.tst", base, name))
+            .arg(tst_path)
             .status()
             .expect("failed to execute process");
         println!("\ttesting result ... {}", status);
