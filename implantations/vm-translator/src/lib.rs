@@ -166,6 +166,7 @@ impl VMTranslator {
                 "or" => self.operate_top_two("M=M|D"),
                 "not" => self.operate_top("M=!M"),
                 "return" => {
+                    self.decr_sp();
                     self.emit(&format!(
                         "@LCL\n\
                          D=M\n\
@@ -175,7 +176,7 @@ impl VMTranslator {
                          @5\n\
                          M=D\n\
                          @ARG\n\
-                         D=A\n\
+                         D=M\n\
                          @SP\n\
                          A=M\n\
                          D=D+M\n\
@@ -183,6 +184,8 @@ impl VMTranslator {
                          A=M\n\
                          A=D-M\n\
                          MD=D-A\n\
+                         @ARG\n\
+                         D=M\n\
                          @SP\n\
                          M=D+1\n\
                          @LCL //that\n\
@@ -207,12 +210,16 @@ impl VMTranslator {
                          @4  //lcl\n\
                          D=A\n\
                          @LCL\n\
-                         M=M-D"
+                         A=M-D\n\
+                         D=M\n\
+                         @LCL\n\
+                         M=D"
                     ));
 
                     // goto ret addr
                     self.emit(&format!(
                         "@5\n\
+                         A=M\n\
                          0;JMP"
                     ));
                 }

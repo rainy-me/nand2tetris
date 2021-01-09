@@ -75,6 +75,8 @@ D=M
 @SP
 A=M-1
 M=M-D
+@SP
+M=M-1
 @LCL
 D=M
 @5
@@ -83,7 +85,7 @@ D=M
 @5
 M=D
 @ARG
-D=A
+D=M
 @SP
 A=M
 D=D+M
@@ -91,6 +93,8 @@ D=D+M
 A=M
 A=D-M
 MD=D-A
+@ARG
+D=M
 @SP
 M=D+1
 @LCL //that
@@ -115,6 +119,10 @@ M=D
 @4  //lcl
 D=A
 @LCL
-M=M-D
+A=M-D
+D=M
+@LCL
+M=D
 @5
+A=M
 0;JMP
