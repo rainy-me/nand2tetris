@@ -63,6 +63,7 @@ impl VMTranslator {
             "{}\n\
              D=M\n\
              @SP\n\
+             A=M\n\
              M=D",
             location
         ));
@@ -109,7 +110,15 @@ impl VMTranslator {
                 let n = n_args.parse::<u16>().unwrap();
                 let return_label = format!("{}$ret.{}", function_name, self.label_index);
                 self.label_index += 1;
-                self.push_location(&format!("@{}", return_label));
+                self.emit(&format!(
+                    "@{}\n\
+                     D=A\n\
+                     @SP\n\
+                     A=M\n\
+                     M=D",
+                     return_label
+                ));
+                self.incr_sp();
                 self.push_location("@LCL");
                 self.push_location("@ARG");
                 self.push_location("@THIS");
@@ -136,7 +145,15 @@ impl VMTranslator {
             ("function", Some(&function_name), Some(n_args)) => {
                 self.emit(&format!("({})", function_name,));
                 let n = n_args.parse::<u16>().unwrap();
-                (0..n).for_each(|_| self.push_location("@0"));
+                (0..n).for_each(|_| {self.emit(
+                    "@0
+                     D=A\n\
+                     @SP\n\
+                     A=M\n\
+                     M=D",
+                );
+                self.incr_sp();
+            });
             }
             (move_cmd, Some(&target), None) => match move_cmd {
                 "label" => self.emit(&format!("({})", target)),
@@ -185,7 +202,7 @@ impl VMTranslator {
                          @5\n\
                          A=D-A\n\
                          D=M\n\
-                         @5\n\
+                         @R13\n\
                          M=D\n\
                          @ARG\n\
                          D=M\n\
@@ -230,7 +247,7 @@ impl VMTranslator {
 
                     // goto ret addr
                     self.emit(&format!(
-                        "@5\n\
+                        "@R13\n\
                          A=M\n\
                          0;JMP"
                     ));

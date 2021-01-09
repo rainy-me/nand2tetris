@@ -1,13 +1,15 @@
 (SimpleFunction.test)
 @0
-D=M
+                     D=A
 @SP
+A=M
 M=D
 @SP
 M=M+1
 @0
-D=M
+                     D=A
 @SP
+A=M
 M=D
 @SP
 M=M+1
@@ -82,7 +84,7 @@ D=M
 @5
 A=D-A
 D=M
-@5
+@R13
 M=D
 @ARG
 D=M
@@ -123,6 +125,6 @@ A=M-D
 D=M
 @LCL
 M=D
-@5
+@R13
 A=M
 0;JMP
