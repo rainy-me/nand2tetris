@@ -46,6 +46,17 @@ impl VMTranslator {
         self.output.push(code.to_string())
     }
 
+    fn push_location(&mut self, location: &str) {
+        self.emit(&format!(
+            "{}\n\
+             D=M\n\
+             @SP\n\
+             M=D",
+            location
+        ));
+        self.incr_sp();
+    }
+
     fn translate_line(&mut self, line: &str) {
         let parts: Vec<&str> = line.split(' ').collect();
         // println!("parts: {:?}", parts);
@@ -82,11 +93,38 @@ impl VMTranslator {
                           M=D-A",
                 );
             }
-            ("call", Some(&function_name), Some(n_args)) if n_args.parse::<u16>().is_ok() => {
-                unimplemented!()
+            ("call", Some(&function_name), Some(n_args)) => {
+                let n = n_args.parse::<u16>().unwrap();
+                let return_label = format!("{}$ret.{}", function_name, self.label_index);
+                self.label_index += 1;
+                self.push_location(&format!("@{}", return_label));
+                self.push_location("@LCL");
+                self.push_location("@ARG");
+                self.push_location("@THIS");
+                self.push_location("@THAT");
+                self.emit(&format!(
+                    "@{}\n\
+                     D=A\n\
+                     @SP\n\
+                     D=M-D\n\
+                     @ARG\n\
+                     M=D\n\
+                     @SP\n\
+                     D=M\n\
+                     @LCL\n\
+                     M=D\n\
+                     @{}\n\
+                     0;JMP\n\
+                     ({})",
+                    n + 5,
+                    function_name,
+                    return_label
+                ));
             }
-            ("function", Some(&function_name), Some(n_args)) if n_args.parse::<u16>().is_ok() => {
-                unimplemented!()
+            ("function", Some(&function_name), Some(n_args)) => {
+                self.emit(&format!("({})", function_name,));
+                let n = n_args.parse::<u16>().unwrap();
+                (0..n).for_each(|_| self.push_location("@0"));
             }
             (move_cmd, Some(&target), None) => match move_cmd {
                 "label" => self.emit(&format!("({})", target)),
@@ -127,7 +165,57 @@ impl VMTranslator {
                 "and" => self.operate_top_two("M=M&D"),
                 "or" => self.operate_top_two("M=M|D"),
                 "not" => self.operate_top("M=!M"),
-                "return" => unimplemented!(),
+                "return" => {
+                    self.emit(&format!(
+                        "@LCL\n\
+                         D=M\n\
+                         @5\n\
+                         A=D-A\n\
+                         D=M\n\
+                         @5\n\
+                         M=D\n\
+                         @ARG\n\
+                         D=A\n\
+                         @SP\n\
+                         A=M\n\
+                         D=D+M\n\
+                         @SP\n\
+                         A=M\n\
+                         A=D-M\n\
+                         MD=D-A\n\
+                         @SP\n\
+                         M=D+1\n\
+                         @LCL //that\n\
+                         A=M-1\n\
+                         D=M\n\
+                         @THAT\n\
+                         M=D\n\
+                         @2  //this\n\
+                         D=A\n\
+                         @LCL\n\
+                         A=M-D\n\
+                         D=M\n\
+                         @THIS\n\
+                         M=D\n\
+                         @3  //arg\n\
+                         D=A\n\
+                         @LCL\n\
+                         A=M-D\n\
+                         D=M\n\
+                         @ARG\n\
+                         M=D\n\
+                         @4  //lcl\n\
+                         D=A\n\
+                         @LCL\n\
+                         M=M-D"
+                    ));
+
+                    // goto ret addr
+                    self.emit(&format!(
+                        "@5\n\
+                         0;JMP"
+                    ));
+                }
                 _ => unimplemented!(),
             },
             _ => unimplemented!(),
@@ -250,6 +338,7 @@ mod tests {
             .output()
             .expect("failed to execute process");
         if !output.status.success() {
+            println!("error: {:?}", output);
             panic!(output.stderr)
         }
     }
@@ -283,5 +372,10 @@ mod tests {
     #[test]
     fn test_fibonacci_series() {
         translate_and_run("08/ProgramFlow/FibonacciSeries/FibonacciSeries")
+    }
+
+    #[test]
+    fn test_simple_function() {
+        translate_and_run("08/FunctionCalls/SimpleFunction/SimpleFunction")
     }
 }
