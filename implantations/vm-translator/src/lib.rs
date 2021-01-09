@@ -1,8 +1,8 @@
+use std::path::PathBuf;
 use std::{
     ffi::{OsStr, OsString},
     unimplemented,
 };
-use std::{fs::DirEntry, path::PathBuf};
 pub struct VMTranslator {
     path: PathBuf,
     target: PathBuf,
