@@ -376,7 +376,7 @@ impl VMTranslator {
 
 #[cfg(test)]
 mod tests {
-    use crate::VMTranslator;
+    use crate::translator::VMTranslator;
     use std::ffi::OsStr;
     use std::path::PathBuf;
 

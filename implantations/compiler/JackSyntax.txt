@@ -1,0 +1,91 @@
+Lexical elements:
+-----------------
+
+<comment>           
+       ::=  '/*' <char>* '*/'
+<eol-comment>       
+       ::=  '//' <char>* '\n'
+<keyword>           
+       ::=  'class' | 'constructor' | 'function' | 'method' |   'field' | 
+            'static' | 'var' | 'int' | 'char' | 'boolean' | 'void' | 'true' | 
+            'false' | 'null' | 'this' | 'let' | 'do' | 'if' | 'else' | 
+            'while' | 'return'
+<symbol>            
+       ::=  '{' | '}' | '(' | ')' | '[' | ']' | '.' | ',' | '; ' |  '+' | 
+            '-' | '*' | '/' | '&' | '|' | '<' | '>' | '=' | '~'
+<integer-constant>  
+       ::=  A decimal number in the range 0..32767.
+<string-constant>   
+       ::=  '"' A sequence of characters INCLUDING /* AND // not including 
+            double quote or newline '"'
+<identifier>        
+       ::=  A sequence of letters, digits, and underscore ('_') not starting 
+            with a digit.
+
+Program structure:
+------------------
+
+<class>             
+       ::=  'class' <class-name> '{' <class-var-dec>* <subroutine-dec>* '}'
+<class-var-dec>     
+       ::=  ('static' | 'field') <type> <var-name> (',' <var-name>)* ';'
+<type>              
+       ::=  'int' | 'char' | 'boolean' | <class-name>
+<subroutine-dec>    
+       ::=  ('constructor' | 'function' | 'method') ('void' | <type>) 
+            <subroutine-name> '(' <parameter-list> ')' <subroutine-body>
+<parameter-list>    
+       ::=  ( <type> <var-name> (',' <type> <var-name>)* )?
+<subroutine-body>   
+       ::=  '{' <var-dec>* <statements> '}'
+<var-dec>           
+       ::=  'var' <type> <var-name> (',' <var-name>)* ';'
+<class-name>        
+       ::=  <identifier>
+<subroutine-name>   
+       ::=  <identifier>
+<var-name>          
+       ::=  <identifier>
+
+Statements:
+-----------
+
+<statements>        
+       ::=  <statement>*
+<statement>         
+       ::=  (<let-statement> | <if-statement> | <while-statement> | 
+            <do-statement> | <return-statement>)*
+<let-statement>     
+       ::=  'let' <var-name> ('[' <expression> ']')? '=' <expression> ';'
+<if-statement>      
+       ::=  'if' '(' <expression> ')' '{' <statements> '}' ( 'else' '{' 
+            <statements> '}' )?
+<while-statement>   
+       ::=  'while' '(' <expression> ')' '{' <statements> '}'
+<do-statement>      
+       ::=  'do' <subroutine-call> ';'
+<return-statement>  
+       ::=  'return' <expression>? ';'
+
+Expressions:
+------------
+
+<expression>        
+       ::=  <term> (op <term>)*
+<term>              
+       ::=  <int-constant> | <string-constant> | <keyword-constant> | 
+            <var-name> | (<var-name> '[' <expression> ']') | 
+            <subroutine-call> | ( '(' <expression> ')' ) | 
+            (<unary-op> <term>)
+<subroutine-call>   
+       ::=  (<subroutine-name> '(' <expression-list> ')') | ((<class-name> | 
+            <var-name>) '.' <subroutine-name> '(' <expression-list> ')')
+<expression-list>   
+       ::=  (<expression> (',' <expression>)* )?
+<op>                
+       ::=  '+' | '-' | '*' | '/' | '&' | '|' | '<' | '>' | '='
+<unary-op>          
+       ::=  '-' | '~'
+<keyword-constant>  
+       ::=  'true' | 'false' | 'null' | 'this'
+

@@ -187,7 +187,7 @@ pub fn to_address(num_like: &str) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{get_predefined_symbols, to_address, Assembler};
+    use crate::assembler::{get_predefined_symbols, to_address, Assembler};
     use std::ffi::OsStr;
     use std::path::PathBuf;
 

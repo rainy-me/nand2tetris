@@ -1,5 +1,5 @@
 [package]
-name = "vm-translator"
+name = "compiler"
 version = "0.1.0"
 authors = ["rainy-me <github@rainy.me>"]
 edition = "2018"
