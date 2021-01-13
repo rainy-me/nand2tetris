@@ -1,83 +1,36 @@
 use std::str::Chars;
 use std::{fmt, path::PathBuf};
-#[derive(Debug, Eq, PartialEq)]
-pub enum Keyword {
-    Class,
-    Constructor,
-    Function,
-    Method,
-    Field,
-    Static,
-    Var,
-    Int,
-    Char,
-    Boolean,
-    Void,
-    True,
-    False,
-    Null,
-    This,
-    Let,
-    Do,
-    If,
-    Else,
-    While,
-    Return,
-}
 
-impl std::str::FromStr for Keyword {
-    type Err = ();
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "class" => Ok(Keyword::Class),
-            "constructor" => Ok(Keyword::Constructor),
-            "function" => Ok(Keyword::Function),
-            "method" => Ok(Keyword::Method),
-            "field" => Ok(Keyword::Field),
-            "static" => Ok(Keyword::Static),
-            "var" => Ok(Keyword::Var),
-            "int" => Ok(Keyword::Int),
-            "char" => Ok(Keyword::Char),
-            "boolean" => Ok(Keyword::Boolean),
-            "void" => Ok(Keyword::Void),
-            "true" => Ok(Keyword::True),
-            "false" => Ok(Keyword::False),
-            "null" => Ok(Keyword::Null),
-            "this" => Ok(Keyword::This),
-            "let" => Ok(Keyword::Let),
-            "do" => Ok(Keyword::Do),
-            "if" => Ok(Keyword::If),
-            "else" => Ok(Keyword::Else),
-            "while" => Ok(Keyword::While),
-            "return" => Ok(Keyword::Return),
-            _ => Err(()),
-        }
-    }
-}
-#[derive(Debug, Eq, PartialEq)]
-pub enum Symbol {
-    LBrace,
-    RBrace,
-    LParen,
-    RParen,
-    LBracket,
-    RBracket,
-    Dot,
-    Comma,
-    Semicolon,
-    Plus,
-    Minus,
-    Asterisk,
-    Slash,
-    And,
-    LT,
-    GT,
-    EQ,
-    Not,
-}
-
-use Symbol::*;
+// impl std::str::FromStr for Keyword {
+//     type Err = ();
+//
+//     fn from_str(s: &str) -> Result<Self, Self::Err> {
+//         match s {
+//             "class" => Ok(Keyword::Class),
+//             "constructor" => Ok(Keyword::Constructor),
+//             "function" => Ok(Keyword::Function),
+//             "method" => Ok(Keyword::Method),
+//             "field" => Ok(Keyword::Field),
+//             "static" => Ok(Keyword::Static),
+//             "var" => Ok(Keyword::Var),
+//             "int" => Ok(Keyword::Int),
+//             "char" => Ok(Keyword::Char),
+//             "boolean" => Ok(Keyword::Boolean),
+//             "void" => Ok(Keyword::Void),
+//             "true" => Ok(Keyword::True),
+//             "false" => Ok(Keyword::False),
+//             "null" => Ok(Keyword::Null),
+//             "this" => Ok(Keyword::This),
+//             "let" => Ok(Keyword::Let),
+//             "do" => Ok(Keyword::Do),
+//             "if" => Ok(Keyword::If),
+//             "else" => Ok(Keyword::Else),
+//             "while" => Ok(Keyword::While),
+//             "return" => Ok(Keyword::Return),
+//             _ => Err(()),
+//         }
+//     }
+// }
 
 // impl std::convert::TryFrom<char> for Symbol {
 //     type Error = ();
@@ -127,13 +80,52 @@ impl<'a> fmt::Display for Literal<'a> {
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum TokenKind {
-    CommentKind,
-    KeywordKind(Keyword),
-    SymbolKind(Symbol),
-    IntegerConstantKind,
-    StringConstantKind,
-    IdentifierKind,
-    TriviaKind,
+    Comment,
+    IntegerConstant,
+    StringConstant,
+    Identifier,
+    Trivia,
+    // Keyword
+    Class,
+    Constructor,
+    Function,
+    Method,
+    Field,
+    Static,
+    Var,
+    Int,
+    Char,
+    Boolean,
+    Void,
+    True,
+    False,
+    Null,
+    This,
+    Let,
+    Do,
+    If,
+    Else,
+    While,
+    Return,
+    // Symbol
+    LBrace,
+    RBrace,
+    LParen,
+    RParen,
+    LBracket,
+    RBracket,
+    Dot,
+    Comma,
+    Semicolon,
+    Plus,
+    Minus,
+    Asterisk,
+    Slash,
+    And,
+    LT,
+    GT,
+    EQ,
+    Not,
 }
 
 use TokenKind::*;
@@ -141,10 +133,13 @@ use TokenKind::*;
 impl TokenKind {
     fn as_str(&self) -> Option<&'static str> {
         match self {
-            KeywordKind(..) => Some("keyword"),
-            SymbolKind(..) => Some("symbol"),
-            IntegerConstantKind => Some("IntegerConstant"),
-            StringConstantKind => Some("StringConstant"),
+            Class | Constructor | Function | Method | Field | Static | Var | Int | Char
+            | Boolean | Void | True | False | Null | This | Let | Do | If | Else | While
+            | Return => Some("keyword"),
+            LBrace | RBrace | LParen | RParen | LBracket | RBracket | Dot | Comma | Semicolon
+            | Plus | Minus | Asterisk | Slash | And | LT | GT | EQ | Not => Some("symbol"),
+            IntegerConstantKind => Some("integerConstant"),
+            StringConstantKind => Some("stringConstant"),
             IdentifierKind => Some("identifier"),
             _ => None,
         }
@@ -208,25 +203,25 @@ impl<'a> Tokenizer<'a> {
             '/' => match self.first() {
                 '*' => self.comment(),
                 '/' => self.eol_comment(),
-                _ => SymbolKind(Slash),
+                _ => Slash,
             },
-            '{' => SymbolKind(LBrace),
-            '}' => SymbolKind(RBrace),
-            '(' => SymbolKind(LParen),
-            ')' => SymbolKind(RParen),
-            '[' => SymbolKind(LBracket),
-            ']' => SymbolKind(RBracket),
-            '.' => SymbolKind(Dot),
-            ',' => SymbolKind(Comma),
-            ';' => SymbolKind(Semicolon),
-            '+' => SymbolKind(Plus),
-            '-' => SymbolKind(Minus),
-            '*' => SymbolKind(Asterisk),
-            '&' => SymbolKind(And),
-            '<' => SymbolKind(LT),
-            '>' => SymbolKind(GT),
-            '=' => SymbolKind(EQ),
-            '~' => SymbolKind(Not),
+            '{' => LBrace,
+            '}' => RBrace,
+            '(' => LParen,
+            ')' => RParen,
+            '[' => LBracket,
+            ']' => RBracket,
+            '.' => Dot,
+            ',' => Comma,
+            ';' => Semicolon,
+            '+' => Plus,
+            '-' => Minus,
+            '*' => Asterisk,
+            '&' => And,
+            '<' => LT,
+            '>' => GT,
+            '=' => EQ,
+            '~' => Not,
             '0'..='9' => self.integer_constant(),
             '"' => self.string_constant(),
             c if is_whitespace(c) => self.whitespace(),
@@ -245,27 +240,27 @@ impl<'a> Tokenizer<'a> {
     }
 
     fn identifier_or_kw(&mut self) -> TokenKind {
-        TokenKind::IdentifierKind
+        TokenKind::Identifier
     }
 
     fn integer_constant(&mut self) -> TokenKind {
-        TokenKind::IntegerConstantKind
+        TokenKind::IntegerConstant
     }
 
     fn string_constant(&mut self) -> TokenKind {
-        TokenKind::StringConstantKind
+        TokenKind::StringConstant
     }
 
     fn comment(&mut self) -> TokenKind {
-        TokenKind::CommentKind
+        TokenKind::Comment
     }
 
     fn whitespace(&mut self) -> TokenKind {
-        TokenKind::TriviaKind
+        TokenKind::Trivia
     }
 
     fn eol_comment(&mut self) -> TokenKind {
-        TokenKind::CommentKind
+        TokenKind::Comment
     }
 }
 
@@ -281,13 +276,13 @@ fn is_whitespace(c: char) -> bool {
 mod tests {
     use crate::Tokenizer;
 
-    use super::{Symbol, TokenKind, XML};
+    use super::{TokenKind, XML};
 
     #[test]
     fn test_single() {
         let mut tokenizer = Tokenizer::new("*");
         let token = tokenizer.tokenize().next().unwrap();
-        assert_eq!(token.kind, TokenKind::SymbolKind(Symbol::Asterisk));
+        assert_eq!(token.kind, TokenKind::Asterisk);
         assert_eq!(token.xml(), "<symbol> * </symbol>".to_string());
     }
 
