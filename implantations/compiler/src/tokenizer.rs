@@ -444,7 +444,7 @@ mod tests {
             .expect("failed to read test file")
             .to_string();
         let output_content = Tokenizer::new(&jack).xml();
-        // compare line by line to ignore the different between newline character
+        // compare line by line to ignore the different newline character
         let mut tokens = output_content.lines();
         for xml_line in xml_content.lines() {
             if xml_line.is_empty() {
