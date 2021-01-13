@@ -406,6 +406,15 @@ mod tests {
             "<stringConstant>  </stringConstant>".to_string()
         );
 
+        let mut tokenizer = Tokenizer::new(r#""TEST EMOJI ✨✨✨""#);
+        let token = tokenizer.tokenize().next().unwrap();
+        assert_eq!(token.kind, TokenKind::StringConstant);
+        assert_eq!(token.literal, Literal::String("TEST EMOJI ✨✨✨"));
+        assert_eq!(
+            token.xml(),
+            "<stringConstant> TEST EMOJI ✨✨✨ </stringConstant>".to_string()
+        );
+
         let mut tokenizer = Tokenizer::new(r#""TEST STRING""#);
         let token = tokenizer.tokenize().next().unwrap();
         assert_eq!(token.kind, TokenKind::StringConstant);
