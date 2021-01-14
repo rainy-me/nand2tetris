@@ -35,21 +35,16 @@ impl<'a> Node<'a> {
         match self {
             Class(..) => "class",
             ClassVarDec(..) => "classVarDec",
-
             SubroutineDec(..) => "subroutineDec",
             ParameterList(..) => "parameterList",
             SubroutineBody(..) => "subroutineBody",
             VarDec(..) => "varDec",
-
-            // Statements
             LetStatement(..) => "letStatement",
             IfStatement(..) => "ifStatement",
             WhileStatement(..) => "whileStatement",
             DoStatement(..) => "doStatement",
             ReturnStatement(..) => "returnStatement",
-            // Expressions
             Term(..) => "term",
-
             ExpressionList(..) => "expressionList",
             Syntax(..) | Type(..) | ClassName(..) | SubroutineName(..) | VarName(..)
             | Statement(..) | SubroutineCall(..) | Op(..) | UnaryOp(..) | KeywordConstant(..) => "",
