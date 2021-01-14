@@ -1,5 +1,5 @@
 use crate::{Token, TokenKind, Tokenizer};
-use Rc;
+use std::rc::Rc;
 pub enum Node<'a> {
     Class(Rc<Token<'a>>),
     ClassVarDec(Rc<Vec<Node<'a>>>),
