@@ -1,8 +1,8 @@
 use std::str::Chars;
 #[derive(Debug)]
 pub struct Token<'a> {
-    kind: TokenKind,
-    literal: Literal<'a>,
+    pub kind: TokenKind,
+    pub literal: Literal<'a>,
 }
 
 impl<'a> Token<'a> {
@@ -23,7 +23,7 @@ impl<'a> Token<'a> {
 }
 
 #[derive(Debug, PartialEq)]
-enum Literal<'a> {
+pub enum Literal<'a> {
     Integer(i16),
     String(&'a str),
 }
@@ -210,7 +210,15 @@ impl<'a> Tokenizer<'a> {
         span
     }
 
-    fn first_token(&mut self) -> Option<Token<'a>> {
+    pub fn first_token_non_trivia(&mut self) -> Option<Token<'a>> {
+        match self.first_token() {
+            Some(t) if t.kind == Whitespace => self.first_token_non_trivia(),
+            None => None,
+            t => t,
+        }
+    }
+
+    pub fn first_token(&mut self) -> Option<Token<'a>> {
         if self.source.is_empty() {
             return None;
         }
