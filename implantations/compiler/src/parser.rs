@@ -1,104 +1,98 @@
-use std::unimplemented;
+use crate::{Token, TokenKind, Tokenizer};
 
-use crate::{tokenizer, Token, TokenKind, Tokenizer};
-
-pub enum NodeKind {
-    Root,
-    Syntax,
-    Class,
-    ClassVarDec,
-    Type,
-    SubroutineDec,
-    ParameterList,
-    SubroutineBody,
-    VarDec,
-    ClassName,
-    SubroutineName,
-    VarName,
+pub enum Node<'a> {
+    Class(Token<'a>),
+    ClassVarDec(Vec<Node<'a>>),
+    Type(Token<'a>),
+    SubroutineDec(Vec<Node<'a>>),
+    ParameterList(Vec<Node<'a>>),
+    SubroutineBody(Vec<Node<'a>>),
+    VarDec(Vec<Node<'a>>),
+    ClassName(Token<'a>),
+    SubroutineName(Token<'a>),
+    VarName(Token<'a>),
     // Statements
-    Statement,
-    LetStatement,
-    IfStatement,
-    WhileStatement,
-    DoStatement,
-    ReturnStatement,
+    Statement(Vec<Node<'a>>),
+    LetStatement(Vec<Node<'a>>),
+    IfStatement(Vec<Node<'a>>),
+    WhileStatement(Vec<Node<'a>>),
+    DoStatement(Vec<Node<'a>>),
+    ReturnStatement(Vec<Node<'a>>),
     // Expressions
-    Term,
-    SubroutineCall,
-    ExpressionList,
-    Op,
-    UnaryOp,
-    KeywordConstant,
+    Term(Vec<Node<'a>>),
+    SubroutineCall(Vec<Node<'a>>),
+    ExpressionList(Vec<Node<'a>>),
+    Op(Token<'a>),
+    UnaryOp(Token<'a>),
+    KeywordConstant(Token<'a>),
+    Syntax(Token<'a>),
 }
 
-use NodeKind::*;
-
-impl NodeKind {
-    fn as_str(&self) -> &'static str {
-        match self {
-            Class => "class",
-            ClassVarDec => "classVarDec",
-
-            SubroutineDec => "subroutineDec",
-            ParameterList => "parameterList",
-            SubroutineBody => "subroutineBody",
-            VarDec => "varDec",
-
-            // Statements
-            LetStatement => "letStatement",
-            IfStatement => "ifStatement",
-            WhileStatement => "whileStatement",
-            DoStatement => "doStatement",
-            ReturnStatement => "returnStatement",
-            // Expressions
-            Term => "term",
-
-            ExpressionList => "expressionList",
-            Root | Syntax | Type | ClassName | SubroutineName | VarName | Statement
-            | SubroutineCall | Op | UnaryOp | KeywordConstant => "",
-        }
-    }
-}
-
-struct Node<'a> {
-    kind: NodeKind,
-    tokens: Option<Vec<Token<'a>>>,
-    children: Option<Vec<Node<'a>>>,
-}
+use Node::*;
 
 impl<'a> Node<'a> {
-    fn wrap(kind: NodeKind, children: Option<Vec<Node<'a>>>) -> Self {
-        Self {
-            kind,
-            tokens: None,
-            children,
+    fn as_str(&self) -> &'static str {
+        match self {
+            Class(..) => "class",
+            ClassVarDec(..) => "classVarDec",
+
+            SubroutineDec(..) => "subroutineDec",
+            ParameterList(..) => "parameterList",
+            SubroutineBody(..) => "subroutineBody",
+            VarDec(..) => "varDec",
+
+            // Statements
+            LetStatement(..) => "letStatement",
+            IfStatement(..) => "ifStatement",
+            WhileStatement(..) => "whileStatement",
+            DoStatement(..) => "doStatement",
+            ReturnStatement(..) => "returnStatement",
+            // Expressions
+            Term(..) => "term",
+
+            ExpressionList(..) => "expressionList",
+            Syntax(..) | Type(..) | ClassName(..) | SubroutineName(..) | VarName(..)
+            | Statement(..) | SubroutineCall(..) | Op(..) | UnaryOp(..) | KeywordConstant(..) => "",
         }
     }
-    fn from(kind: NodeKind, token: Token<'a>) -> Self {
-        Self {
-            kind,
-            tokens: Some(vec![token]),
-            children: None,
-        }
-    }
+
     pub fn xml(&self, indent: usize) -> String {
         let mut out = Vec::new();
-        let wrap_tag = self.kind.as_str();
+        let wrap_tag = self.as_str();
         let pad = " ".repeat(indent);
 
         if !wrap_tag.is_empty() {
             out.push(format!("{}<{}>", pad, wrap_tag));
         }
-        self.children
-            .as_ref()
-            .unwrap_or(&vec![])
-            .iter()
-            .for_each(|node| out.push(node.xml(indent + 1)));
-        self.tokens
-            .as_ref()
-            .unwrap_or(&vec![])
-            .iter()
-            .for_each(|token| out.push(format!("{}{}", pad, token.xml())));
+        match self {
+            ClassVarDec(children)
+            | SubroutineDec(children)
+            | ParameterList(children)
+            | SubroutineBody(children)
+            | VarDec(children)
+            | Statement(children)
+            | LetStatement(children)
+            | IfStatement(children)
+            | WhileStatement(children)
+            | DoStatement(children)
+            | ReturnStatement(children)
+            | Term(children)
+            | SubroutineCall(children)
+            | ExpressionList(children) => children
+                .iter()
+                .for_each(|node| out.push(node.xml(indent + 1))),
+            Class(token)
+            | Syntax(token)
+            | Type(token)
+            | ClassName(token)
+            | SubroutineName(token)
+            | VarName(token)
+            | Op(token)
+            | UnaryOp(token)
+            | KeywordConstant(token) => {
+                out.push(format!("{}{}", pad, token.xml()));
+            }
+        };
         if !wrap_tag.is_empty() {
             out.push(format!("{}</{}>", pad, wrap_tag));
         }
@@ -106,7 +100,7 @@ impl<'a> Node<'a> {
     }
 }
 
-struct Parser<'a> {
+pub struct Parser<'a> {
     tokenizer: Tokenizer<'a>,
 }
 
@@ -121,15 +115,12 @@ impl<'a> Parser<'a> {
     pub fn parse(&mut self) -> Node<'a> {
         let token = self.tokenizer.first_token_non_trivia().unwrap();
         match token.kind {
-            TokenKind::Var => {
-                let children = vec![
-                    Node::from(NodeKind::Syntax, token),
-                    self.parse_type(),
-                    self.parse_identifier(),
-                    self.parse_symbol(TokenKind::Semicolon),
-                ];
-                Node::wrap(NodeKind::VarDec, Some(children))
-            }
+            TokenKind::Var => Node::VarDec(vec![
+                Node::Syntax(token),
+                self.parse_type(),
+                self.parse_identifier(),
+                self.parse_symbol(TokenKind::Semicolon),
+            ]),
             _ => panic!(format!("unexpected token {:?}", token)),
         }
     }
@@ -140,7 +131,7 @@ impl<'a> Parser<'a> {
             .first_token_non_trivia()
             .expect("expect symbol token but there is no more");
         match &token.kind {
-            k if k == &kind => Node::from(NodeKind::Type, token),
+            k if k == &kind => Node::Syntax(token),
             _ => panic!(),
         }
     }
@@ -152,7 +143,7 @@ impl<'a> Parser<'a> {
             .expect("expect type token but there is no more");
         match token.kind {
             TokenKind::Int | TokenKind::Char | TokenKind::Boolean | TokenKind::Identifier => {
-                Node::from(NodeKind::Type, token)
+                Node::Type(token)
             }
             _ => panic!(format!("unexpected token kind {:?}", token.kind)),
         }
@@ -164,7 +155,7 @@ impl<'a> Parser<'a> {
             .first_token_non_trivia()
             .expect("expect identifier token but there is no more");
         match token.kind {
-            TokenKind::Identifier => Node::from(NodeKind::VarName, token),
+            TokenKind::Identifier => Node::VarName(token),
             _ => panic!(),
         }
     }
@@ -173,6 +164,11 @@ impl<'a> Parser<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // #[test]
+    // fn test_enum_size() {
+    //     println!("sizeof Node enum: {}", std::mem::size_of::<Node>());
+    // }
 
     #[test]
     fn test_var_dec() {
