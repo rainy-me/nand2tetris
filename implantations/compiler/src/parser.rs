@@ -31,10 +31,15 @@ pub enum Node<'a> {
     Syntax(Rc<Token<'a>>),
 }
 
+#[allow(non_snake_case)]
+fn P<T>(inner: T) -> Rc<T> {
+    Rc::new(inner)
+}
+
 use Node::*;
 
 impl<'a> Node<'a> {
-    fn as_str(&self) -> &'static str {
+    fn as_tag(&self) -> &'static str {
         match self {
             Class(..) => "class",
             ClassVarDec(..) => "classVarDec",
@@ -56,9 +61,13 @@ impl<'a> Node<'a> {
         }
     }
 
-    pub fn xml(&self, indent: usize) -> String {
-        let mut out = Vec::new();
-        let wrap_tag = self.as_str();
+    pub fn xml(&self) -> String {
+        self.xml_with_indent(0)
+    }
+
+    fn xml_with_indent(&self, indent: usize) -> String {
+        let mut out = vec![];
+        let wrap_tag = self.as_tag();
         let pad = " ".repeat(indent * 2);
         let incr = if wrap_tag.is_empty() { 0 } else { 1 };
 
@@ -84,7 +93,7 @@ impl<'a> Node<'a> {
             | Expression(children)
             | ExpressionList(children) => children
                 .iter()
-                .for_each(|node| out.push(node.xml(indent + incr))),
+                .for_each(|node| out.push(node.xml_with_indent(indent + incr))),
             Syntax(token)
             | Type(token)
             | ClassName(token)
@@ -107,6 +116,24 @@ pub struct Parser<'a> {
     tokenizer: Tokenizer<'a>,
 }
 
+macro_rules! is {
+    ($( $pattern:pat )|+) => {
+        move |t: &Token<'a>| matches!(t.kind, $( $pattern )|+)
+    }
+}
+
+#[cfg(test)]
+const CYAN: &'static str = "\x1b[96m";
+#[cfg(test)]
+const END: &'static str = "\x1b[0m";
+
+macro_rules! scope {
+    ($( $x:expr )+) => {
+        #[cfg(test)]
+        println!("enter: \"{}{}{}\"", CYAN, $($x)+, END);
+    };
+}
+
 impl<'a> Parser<'a> {
     pub fn new(source: &'a str) -> Self {
         Self {
@@ -119,193 +146,192 @@ impl<'a> Parser<'a> {
         self.class()
     }
 
-    pub fn var_dec(&mut self) -> Node<'a> {
-        debug("<var-dec>");
+    fn var_dec(&mut self) -> Node<'a> {
+        scope!("<var-dec>");
         let mut children = vec![
-            self.token_exact(Tk::Var),
+            self.token(is!(Tk::Var)),
             self.token(is_type),
-            self.token(is_identifier),
+            self.token(is!(Tk::Ident)),
         ];
-
-        while let Some(comma) = self.try_token_exact(Tk::Comma) {
+        while let Some(comma) = self.try_token(is!(Tk::Comma)) {
             children.push(comma);
-            children.push(self.token(is_identifier));
+            children.push(self.token(is!(Tk::Ident)));
         }
-        children.push(self.token_exact(Tk::Semicolon));
-        Node::VarDec(Rc::new(children))
+        children.push(self.token(is!(Tk::Semi)));
+        VarDec(P(children))
     }
 
     fn try_statement(&mut self) -> Option<Node<'a>> {
-        let next = self.peek_next_token()?;
-        match next.kind {
+        match self.peek_token()?.kind {
             Tk::Let => {
-                debug("<let-statement>");
-                let mut children = vec![
-                    Node::Syntax(Rc::new(self.expect_take_token())),
-                    self.token(is_identifier),
-                ];
-                if let Some(bracket) = self.try_token_exact(Tk::LBracket) {
+                scope!("<let-statement>");
+                let mut children = vec![Syntax(P(self.take_token())), self.token(is!(Tk::Ident))];
+                if let Some(bracket) = self.try_token(is!(Tk::LBracket)) {
                     children.push(bracket);
                     children.push(self.expr().expect("expected expr"));
-                    children.push(self.token_exact(Tk::RBracket));
+                    children.push(self.token(is!(Tk::RBracket)));
                 };
-                children.push(self.token_exact(Tk::EQ));
+                children.push(self.token(is!(Tk::EQ)));
                 children.push(self.expr().expect("expected expr"));
-                children.push(self.token_exact(Tk::Semicolon));
-                Some(Node::LetStatement(Rc::new(children)))
+                children.push(self.token(is!(Tk::Semi)));
+                Some(LetStatement(P(children)))
             }
             Tk::If => {
-                debug("<if-statement>");
+                scope!("<if-statement>");
                 let mut children = vec![
-                    Node::Syntax(Rc::new(self.expect_take_token())),
-                    self.token_exact(Tk::LParen),
+                    Syntax(P(self.take_token())),
+                    self.token(is!(Tk::LParen)),
                     self.expr().expect("expected expr"),
-                    self.token_exact(Tk::RParen),
-                    self.token_exact(Tk::LBrace),
+                    self.token(is!(Tk::RParen)),
+                    self.token(is!(Tk::LBrace)),
                     self.statements(),
-                    self.token_exact(Tk::RBrace),
+                    self.token(is!(Tk::RBrace)),
                 ];
-                if let Some(else_node) = self.try_token_exact(Tk::Else) {
+                if let Some(else_node) = self.try_token(is!(Tk::Else)) {
                     children.push(else_node);
-                    children.push(self.token_exact(Tk::LBrace));
+                    children.push(self.token(is!(Tk::LBrace)));
                     children.push(self.statements());
-                    children.push(self.token_exact(Tk::RBrace));
+                    children.push(self.token(is!(Tk::RBrace)));
                 };
-                Some(Node::IfStatement(Rc::new(children)))
+                Some(IfStatement(P(children)))
             }
             Tk::While => {
-                debug("<while-statement>");
-                let children = vec![
-                    self.token_exact(Tk::While),
-                    self.token_exact(Tk::LParen),
+                scope!("<while-statement>");
+                Some(WhileStatement(P(vec![
+                    self.token(is!(Tk::While)),
+                    self.token(is!(Tk::LParen)),
                     self.expr().expect("expected expr"),
-                    self.token_exact(Tk::RParen),
-                    self.token_exact(Tk::LBrace),
+                    self.token(is!(Tk::RParen)),
+                    self.token(is!(Tk::LBrace)),
                     self.statements(),
-                    self.token_exact(Tk::RBrace),
-                ];
-                Some(Node::WhileStatement(Rc::new(children)))
+                    self.token(is!(Tk::RBrace)),
+                ])))
             }
             Tk::Do => {
-                debug("<do-statement>");
-                let op = self.token_exact(Tk::Do);
-                let name = self.expect_take_token();
-                let symbol = self.peek_next_token()?;
-                let children = vec![
+                scope!("<do-statement>");
+                let op = self.token(is!(Tk::Do));
+                let name = self.take_token();
+                let symbol = self.peek_token()?;
+                Some(DoStatement(P(vec![
                     op,
                     self.subroutine_call(name, symbol),
-                    self.token_exact(Tk::Semicolon),
-                ];
-                Some(Node::DoStatement(Rc::new(children)))
+                    self.token(is!(Tk::Semi)),
+                ])))
             }
             Tk::Return => {
-                debug("<return-statement>");
-                let mut children = vec![self.token_exact(Tk::Return)];
-                if let Some(semi) = self.try_token_exact(Tk::Semicolon) {
+                scope!("<return-statement>");
+                let mut children = vec![self.token(is!(Tk::Return))];
+                if let Some(semi) = self.try_token(is!(Tk::Semi)) {
                     children.push(semi);
                 } else {
                     children.push(self.expr().expect("expected expr"));
-                    children.push(self.token_exact(Tk::Semicolon));
+                    children.push(self.token(is!(Tk::Semi)));
                 }
-                Some(Node::ReturnStatement(Rc::new(children)))
+                Some(ReturnStatement(P(children)))
             }
             _ => None,
         }
     }
 
     fn statements(&mut self) -> Node<'a> {
-        debug("<statements>");
+        scope!("<statements>");
         let mut children = vec![];
-        if let Some(statement) = self.try_statement() {
-            children.push(statement);
-        }
         while let Some(statement) = self.try_statement() {
             children.push(statement);
         }
-        Node::Statements(Rc::new(children))
+        Statements(P(children))
     }
 
-    fn expect_take_token(&mut self) -> Token<'a> {
-        let token = self
-            .tokenizer
+    fn take_token(&mut self) -> Token<'a> {
+        self.tokenizer
             .take_token()
-            .expect("expect identifier token but there is no more");
-        token
+            .expect("expect token but there is no more")
     }
 
-    fn peek_next_token(&mut self) -> Option<Token<'a>> {
+    fn peek_token(&mut self) -> Option<Token<'a>> {
         self.tokenizer.peek_token()
     }
 
-    pub fn class(&mut self) -> Node<'a> {
-        debug("<class>");
-        let mut children = vec![
-            self.token(|t| t.kind == Tk::Class),
-            self.token(is_identifier),
-            self.token(|t| t.kind == Tk::LBrace),
-        ];
+    fn token(&mut self, predicate: impl Fn(&Token<'a>) -> bool) -> Node<'a> {
+        let token = self.take_token();
+        if predicate(&token) {
+            return VarName(P(token));
+        }
+        panic!("{:?} does not fit in predicate function", token)
+    }
 
+    fn try_token(&mut self, predicate: impl Fn(&Token<'a>) -> bool) -> Option<Node<'a>> {
+        if predicate(&self.peek_token()?) {
+            return Some(VarName(P(self.take_token())));
+        }
+        None
+    }
+
+    pub fn class(&mut self) -> Node<'a> {
+        scope!("<class>");
+        let mut children = vec![
+            self.token(is!(Tk::Class)),
+            self.token(is!(Tk::Ident)),
+            self.token(is!(Tk::LBrace)),
+        ];
         while let Some(node) = self.try_class_var_dec() {
             children.push(node);
         }
         while let Some(node) = self.try_subroutine_dec() {
             children.push(node);
         }
-        children.push(self.token(|t| t.kind == Tk::RBrace));
-        Node::Class(Rc::new(children))
+        children.push(self.token(is!(Tk::RBrace)));
+        Class(P(children))
     }
 
     fn try_class_var_dec(&mut self) -> Option<Node<'a>> {
-        let token = self.try_token(|t| matches!(t.kind, Tk::Static | Tk::Field))?;
-        debug("<class-var-dec>");
-        let mut children = vec![token, self.token(is_type), self.token(is_identifier)];
-        while let Some(comma) = self.try_token_exact(Tk::Comma) {
+        scope!("<class-var-dec>");
+        let mut children = vec![
+            self.try_token(is!(Tk::Static | Tk::Field))?,
+            self.token(is_type),
+            self.token(is!(Tk::Ident)),
+        ];
+        while let Some(comma) = self.try_token(is!(Tk::Comma)) {
             children.push(comma);
-            children.push(self.token(is_identifier));
+            children.push(self.token(is!(Tk::Ident)));
         }
-        children.push(self.token_exact(Tk::Semicolon));
-        Some(Node::ClassVarDec(Rc::new(children)))
+        children.push(self.token(is!(Tk::Semi)));
+        Some(ClassVarDec(P(children)))
     }
 
     fn try_subroutine_dec(&mut self) -> Option<Node<'a>> {
-        let token =
-            self.try_token(|t| matches!(t.kind, Tk::Constructor | Tk::Function | Tk::Method))?;
-        debug("<subroutine-dec>");
-
+        scope!("<subroutine-dec>");
         let children = vec![
-            token,
+            self.try_token(is!(Tk::Constructor | Tk::Function | Tk::Method))?,
             self.token(|t| is_type(t) || t.kind == Tk::Void),
-            self.token(is_identifier),
-            self.token_exact(Tk::LParen),
+            self.token(is!(Tk::Ident)),
+            self.token(is!(Tk::LParen)),
             self.parameter_list(),
-            self.token_exact(Tk::RParen),
+            self.token(is!(Tk::RParen)),
             self.subroutine_body(),
         ];
-        Some(Node::SubroutineDec(Rc::new(children)))
+        Some(SubroutineDec(P(children)))
     }
 
     fn parameter_list(&mut self) -> Node<'a> {
-        debug("<parameter-list>");
-        match self.try_token(is_type) {
-            Some(node) => {
-                let mut children = vec![node, self.token(is_identifier)];
-                while let Some(comma) = self.try_token_exact(Tk::Comma) {
-                    children.push(comma);
-                    children.push(self.token(is_type));
-                    children.push(self.token(is_identifier));
-                }
-                Node::ParameterList(Rc::new(children))
+        scope!("<parameter-list>");
+        if let Some(node) = self.try_token(is_type) {
+            let mut children = vec![node, self.token(is!(Tk::Ident))];
+            while let Some(comma) = self.try_token(is!(Tk::Comma)) {
+                children.push(comma);
+                children.push(self.token(is_type));
+                children.push(self.token(is!(Tk::Ident)));
             }
-            _ => Node::ParameterList(Rc::new(vec![])),
-        }
+            return ParameterList(P(children));
+        };
+        ParameterList(P(vec![]))
     }
 
     fn subroutine_body(&mut self) -> Node<'a> {
-        debug("<subroutine-body>");
-        let mut children = vec![self.token_exact(Tk::LBrace)];
-
+        scope!("<subroutine-body>");
+        let mut children = vec![self.token(is!(Tk::LBrace))];
         loop {
-            match self.peek_next_token() {
+            match self.peek_token() {
                 Some(t) if t.kind == Tk::Var => {
                     children.push(self.var_dec());
                 }
@@ -313,15 +339,14 @@ impl<'a> Parser<'a> {
             }
         }
         children.push(self.statements());
-        children.push(self.token_exact(Tk::RBrace));
-        Node::SubroutineBody(Rc::new(children))
+        children.push(self.token(is!(Tk::RBrace)));
+        SubroutineBody(P(children))
     }
 
     fn term(&mut self) -> Option<Node<'a>> {
-        debug("<term>");
+        scope!("<term>");
         // let ret = Vec::new();
-        let token = self.peek_next_token()?;
-        match token.kind {
+        let inner = match self.peek_token()?.kind {
             Tk::IntegerConstant
             | Tk::StringConstant
             | Tk::Class
@@ -344,131 +369,65 @@ impl<'a> Parser<'a> {
             | Tk::If
             | Tk::Else
             | Tk::While
-            | Tk::Return => Some(Node::Term(Rc::new(vec![Node::Syntax(Rc::new(
-                self.expect_take_token(),
-            ))]))),
-            Tk::Identifier => {
-                let token = self.expect_take_token();
-                match self.peek_next_token() {
-                    Some(t) if t.kind == Tk::LBracket => Some(Node::Term(Rc::new(vec![
-                        Node::VarName(Rc::new(token)),
-                        Node::Syntax(Rc::new(self.expect_take_token())),
+            | Tk::Return => vec![Syntax(P(self.take_token()))],
+            Tk::Ident => {
+                let token = self.take_token();
+                match self.peek_token() {
+                    Some(t) if t.kind == Tk::LBracket => vec![
+                        VarName(P(token)),
+                        Syntax(P(self.take_token())),
                         self.expr().expect("expected expr"),
-                        self.token_exact(Tk::RBracket),
-                    ]))),
-                    Some(t) if matches!(t.kind, Tk::LParen | Tk::Dot) => {
-                        Some(Node::Term(Rc::new(vec![self.subroutine_call(token, t)])))
+                        self.token(is!(Tk::RBracket)),
+                    ],
+                    Some(t) if is!(Tk::LParen | Tk::Dot)(&t) => {
+                        vec![self.subroutine_call(token, t)]
                     }
-                    _ => Some(Node::Term(Rc::new(vec![Node::VarName(Rc::new(token))]))),
+                    _ => vec![VarName(P(token))],
                 }
             }
-            Tk::LParen => Some(Node::Term(Rc::new(vec![
-                Node::Syntax(Rc::new(self.expect_take_token())),
+            Tk::LParen => vec![
+                Syntax(P(self.take_token())),
                 self.expr().expect("expected expr"),
-                self.token_exact(Tk::RParen),
-            ]))),
-            _ if is_unary_op(&token) => Some(Node::Term(Rc::new(vec![
-                Node::UnaryOp(Rc::new(self.expect_take_token())),
-                self.term().unwrap(),
-            ]))),
-            _ => None,
+                self.token(is!(Tk::RParen)),
+            ],
+            t if matches!(t, Tk::Minus | Tk::Not) => {
+                vec![UnaryOp(P(self.take_token())), self.term().unwrap()]
+            }
+            _ => vec![],
+        };
+        if inner.is_empty() {
+            None
+        } else {
+            Some(Term(P(inner)))
         }
     }
 
     fn subroutine_call(&mut self, name: Token<'a>, symbol: Token<'a>) -> Node<'a> {
-        debug("<subroutine-call>");
+        scope!("<subroutine-call>");
         match symbol.kind {
-            Tk::LParen => Node::SubroutineCall(Rc::new(vec![
-                Node::SubroutineName(Rc::new(name)),
-                Node::Syntax(Rc::new(self.expect_take_token())),
+            Tk::LParen => SubroutineCall(P(vec![
+                SubroutineName(P(name)),
+                Syntax(P(self.take_token())),
                 self.expr_list(),
-                self.token_exact(Tk::RParen),
+                self.token(is!(Tk::RParen)),
             ])),
-            Tk::Dot => Node::SubroutineCall(Rc::new(vec![
-                Node::ClassName(Rc::new(name)),
-                Node::Syntax(Rc::new(self.expect_take_token())),
-                self.token(is_identifier),
-                self.token_exact(Tk::LParen),
+            Tk::Dot => SubroutineCall(P(vec![
+                ClassName(P(name)),
+                Syntax(P(self.take_token())),
+                self.token(is!(Tk::Ident)),
+                self.token(is!(Tk::LParen)),
                 self.expr_list(),
-                self.token_exact(Tk::RParen),
+                self.token(is!(Tk::RParen)),
             ])),
-            _ => panic!(
-                "symbol {:?} should not be expected in subroutine call",
-                symbol
-            ),
+            _ => panic!("symbol {:?} is not expected in subroutine call", symbol),
         }
     }
 
     fn expr(&mut self) -> Option<Node<'a>> {
-        debug("<expr>");
+        scope!("<expr>");
         let mut children = vec![];
-        let term = self.term()?;
-        children.push(term);
-        while let Some(op) = self.try_token(is_op) {
-            children.push(op);
-            children.push(self.term().expect("expect term"));
-        }
-        Some(Node::Expression(Rc::new(children)))
-    }
-
-    fn expr_list(&mut self) -> Node<'a> {
-        debug("<expr-list>");
-        let mut children = vec![];
-        if let Some(expr) = self.expr() {
-            children.push(expr);
-        }
-        while let Some(comma) = self.try_token_exact(Tk::Comma) {
-            children.push(comma);
-            children.push(self.expr().expect("expected expr after comma"));
-        }
-        Node::ExpressionList(Rc::new(children))
-    }
-
-    fn token_exact(&mut self, predicate: Tk) -> Node<'a> {
-        let token = self.expect_take_token();
-        if token.kind == predicate {
-            return Node::VarName(Rc::new(token));
-        }
-        panic!("{:?} does not fit in predicate {:?}", token, predicate)
-    }
-
-    fn try_token_exact(&mut self, predicate: Tk) -> Option<Node<'a>> {
-        let token = self.peek_next_token()?;
-        if token.kind == predicate {
-            return Some(Node::VarName(Rc::new(self.expect_take_token())));
-        }
-        // panic!("{:?} does not fit in predicate {:?}", token, predicate)
-        None
-    }
-
-    fn token(&mut self, predicate: impl Fn(&Token<'a>) -> bool) -> Node<'a> {
-        let token = self.expect_take_token();
-        if predicate(&token) {
-            return Node::VarName(Rc::new(token));
-        }
-        panic!("{:?} does not fit in predicate function", token)
-    }
-
-    fn try_token(&mut self, predicate: impl Fn(&Token<'a>) -> bool) -> Option<Node<'a>> {
-        let token = self.peek_next_token()?;
-        if predicate(&token) {
-            return Some(Node::VarName(Rc::new(self.expect_take_token())));
-        }
-        None
-    }
-}
-
-fn is_type<'a>(token: &Token<'a>) -> bool {
-    matches!(
-        token.kind,
-        Tk::Int | Tk::Char | Tk::Boolean | Tk::Identifier
-    )
-}
-
-fn is_op<'a>(token: &Token<'a>) -> bool {
-    matches!(
-        token.kind,
-        Tk::Plus
+        children.push(self.term()?);
+        while let Some(op) = self.try_token(is!(Tk::Plus
             | Tk::Minus
             | Tk::Asterisk
             | Tk::Slash
@@ -476,16 +435,30 @@ fn is_op<'a>(token: &Token<'a>) -> bool {
             | Tk::Or
             | Tk::LT
             | Tk::GT
-            | Tk::EQ
-    )
+            | Tk::EQ))
+        {
+            children.push(op);
+            children.push(self.term().expect("expect term but not found"));
+        }
+        Some(Expression(P(children)))
+    }
+
+    fn expr_list(&mut self) -> Node<'a> {
+        scope!("<expr-list>");
+        let mut children = vec![];
+        if let Some(expr) = self.expr() {
+            children.push(expr);
+        }
+        while let Some(comma) = self.try_token(is!(Tk::Comma)) {
+            children.push(comma);
+            children.push(self.expr().expect("expected expr after comma"));
+        }
+        ExpressionList(P(children))
+    }
 }
 
-fn is_unary_op<'a>(token: &Token<'a>) -> bool {
-    matches!(token.kind, Tk::Minus | Tk::Not)
-}
-
-fn is_identifier<'a>(token: &Token<'a>) -> bool {
-    matches!(token.kind, Tk::Identifier)
+fn is_type<'a>(token: &Token<'a>) -> bool {
+    matches!(token.kind, Tk::Int | Tk::Char | Tk::Boolean | Tk::Ident)
 }
 
 #[cfg(test)]
@@ -513,7 +486,7 @@ mod tests {
         let xml_content = std::fs::read_to_string(xml_path)
             .expect("failed to read test file")
             .to_string();
-        let tree = Parser::new(&jack).class().xml(0);
+        let tree = Parser::new(&jack).class().xml();
 
         std::fs::write(out_path, &tree).expect("failed to write file");
         // compare line by line to ignore the different newline character
@@ -537,12 +510,12 @@ mod tests {
         let node = Parser::new("var int x;").var_dec();
         assert_eq!(
             r#"<varDec>
-     <keyword> var </keyword>
-     <keyword> int </keyword>
-     <identifier> x </identifier>
-     <symbol> ; </symbol>
-    </varDec>"#,
-            node.xml(0)
+  <keyword> var </keyword>
+  <keyword> int </keyword>
+  <identifier> x </identifier>
+  <symbol> ; </symbol>
+</varDec>"#,
+            node.xml()
         )
     }
 
@@ -564,12 +537,3 @@ mod tests {
         compare("Square/Square");
     }
 }
-
-const CYAN: &'static str = "\x1b[96m";
-// const UNDERLINE: &'static str = "\033[4m";
-const END: &'static str = "\x1b[0m";
-//
-fn debug(msg: &str) {
-    println!("{}{}{}", CYAN, msg, END);
-}
-//

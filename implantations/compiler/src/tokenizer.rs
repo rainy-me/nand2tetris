@@ -54,7 +54,7 @@ pub enum TokenKind {
     Comment,
     IntegerConstant,
     StringConstant,
-    Identifier,
+    Ident,
     Whitespace,
     // Keyword
     Class,
@@ -87,7 +87,7 @@ pub enum TokenKind {
     RBracket,
     Dot,
     Comma,
-    Semicolon,
+    Semi,
     Plus,
     Minus,
     Asterisk,
@@ -139,11 +139,11 @@ impl TokenKind {
             Class | Constructor | Function | Method | Field | Static | Var | Int | Char
             | Boolean | Void | True | False | Null | This | Let | Do | If | Else | While
             | Return => Some("keyword"),
-            LBrace | RBrace | LParen | RParen | LBracket | RBracket | Dot | Comma | Semicolon
-            | Plus | Minus | Asterisk | Slash | And | Or | LT | GT | EQ | Not => Some("symbol"),
+            LBrace | RBrace | LParen | RParen | LBracket | RBracket | Dot | Comma | Semi | Plus
+            | Minus | Asterisk | Slash | And | Or | LT | GT | EQ | Not => Some("symbol"),
             IntegerConstant => Some("integerConstant"),
             StringConstant => Some("stringConstant"),
-            Identifier => Some("identifier"),
+            Ident => Some("identifier"),
             _ => None,
         }
     }
@@ -282,7 +282,7 @@ impl<'a> Tokenizer<'a> {
             ']' => RBracket,
             '.' => Dot,
             ',' => Comma,
-            ';' => Semicolon,
+            ';' => Semi,
             '+' => Plus,
             '-' => Minus,
             '*' => Asterisk,
@@ -309,7 +309,7 @@ impl<'a> Tokenizer<'a> {
                 self.eat_while(is_identifier_tail);
                 match self.current_span().0.parse::<TokenKind>() {
                     Ok(kind) => kind,
-                    _ => TokenKind::Identifier,
+                    _ => TokenKind::Ident,
                 }
             }
             c if is_whitespace(c) => {
