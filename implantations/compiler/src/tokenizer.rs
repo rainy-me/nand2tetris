@@ -215,7 +215,7 @@ impl<'a> Tokenizer<'a> {
     }
     fn current_span(&mut self) -> (&'a str, usize) {
         let len = self.source_len - self.read_pos - self.chars.as_str().len();
-        (&self.source[self.read_pos..self.read_pos + len].trim(), len)
+        (&self.source[self.read_pos..self.read_pos + len], len)
     }
 
     fn take_span(&mut self) -> &'a str {
