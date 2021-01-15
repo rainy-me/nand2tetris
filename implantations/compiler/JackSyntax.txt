@@ -1,4 +1,4 @@
-Lexical 2:
+Lexical elements:
 -----------------
 
 <comment>           
