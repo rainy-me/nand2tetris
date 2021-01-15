@@ -231,6 +231,7 @@ impl<'a> Tokenizer<'a> {
         match self.take_token_all_type() {
             Some(t) if matches!(t.kind, Whitespace | Comment) => self.take_token(),
             t => {
+                #[cfg(test)]
                 println!("taken {:?}", t);
                 t
             }
